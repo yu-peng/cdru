@@ -400,7 +400,9 @@ class SearchProblem(object):
         new_candidate.assigned_variables = candidate.assigned_variables.copy()
 
         new_candidate.add_assignments(candidate.assignments)
-        new_candidate.add_temporal_relaxations(candidate.temporal_relaxations)
+        # We do not need the following line as it adds duplicated relaxations to the
+        # new candidate.
+        # new_candidate.add_temporal_relaxations(candidate.temporal_relaxations)
         for relaxation in relaxations:
             if not new_candidate.add_temporal_relaxation(relaxation):
                 return None
