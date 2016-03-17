@@ -3,6 +3,7 @@ __author__ = 'yupeng'
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.decision_variable import DecisionVariable
 from temporal_network.assignment import Assignment
+import xml.etree.ElementTree
 
 class Tpnu(object):
 
@@ -28,6 +29,138 @@ class Tpnu(object):
             if len(constraint.guards) == 0:
                 constraint.activated = True
 
+    @staticmethod
+    def parseCCTP(inFilename):
+        e = xml.etree.ElementTree.parse(inFilename).getroot()
+
+        tpnu_name = e.get('NAME')
+        tpnu = Tpnu('', tpnu_name)
+
+        # In TPN format every node (or event in TPN terminology) has a non-unique name
+        # and an unique id. Both of those are strings. For efficiency DC checking algorithms
+        # denote each node by a number, such that we can cheaply check their equality.
+
+        # parse the event
+        event_ids = set()
+        tpnu.node_id_to_name = {}
+        tpnu.node_number_to_id = {}
+        tpnu.node_id_to_number = {}
+
+        for event_obj in e.findall('EVENT'):
+            eid, ename = event_obj.get('ID'), event_obj.get('NAME')
+            event_ids.add(eid)
+            tpnu.node_id_to_name[eid] = ename
+
+        for eid in event_ids:
+            next_number = len(tpnu.node_number_to_id) + 1
+            tpnu.node_number_to_id[next_number] = eid
+            tpnu.node_id_to_number[eid] = next_number
+
+        tpnu.num_nodes = len(tpnu.node_number_to_id)
+
+        # parse the decision variables
+        assignment_map = {}
+
+        for variable_obj in e.findall('DECISION-VARIABLE'):
+            dv_id = variable_obj.get('ID')
+            dv_name = variable_obj.get('NAME')
+            decision_variable = DecisionVariable(dv_id,dv_name)
+
+            # construct the assignment for the variable
+            for value_obj in variable_obj.findall('VALUE'):
+                # value_id = value_obj.get('ID')
+                value_name = value_obj.get('VALUE-NAME')
+                value_utility = value_obj.get('VALUE-UTILITY')
+                assignment = Assignment(decision_variable, value_name, value_utility)
+
+                # add the assignment to the variable, and a dictionary for future reference
+                decision_variable.add_domain_value(assignment)
+
+                # using the id of the variable and the value of the assignment as key
+                assignment_map[(dv_id,value_name)] = assignment
+
+            tpnu.add_decision_variable(decision_variable)
+
+        # parse variables' guards
+        for variable_obj in e.findall('DECISION-VARIABLE'):
+            dv_id = variable_obj.get('ID')
+            decision_variable = tpnu.decision_variables[dv_id]
+
+            # the guard could be a conjunctive set of assignment
+
+            for guard_obj in variable_obj.findall('GUARD'):
+                # guard_id = guard_obj.get('ID')
+                guard_variable_id = guard_obj.get('GUARD-VARIABLE')
+                guard_value = guard_obj.get('GUARD-VALUE')
+
+                # retrieve the assignment
+                guard_assignment = assignment_map[(guard_variable_id,guard_value)]
+                # and add to the guards of this decision variable
+                decision_variable.add_guard(guard_assignment)
+
+
+        # parse the temporal constraints and episodes
+
+        # if line below confuses you, that's expected... We need better automated code generation for parsing...
+        for constraint_obj in e.findall('CONSTRAINT'):
+            # duration can be one of three types - controllable, uncertain and probabilistic
+            # here we are only handling the first two cases, which are sorted into two lists
+            # in our resulting stnu class.
+
+            lower_bound = constraint_obj.get('LOWERBOUND')
+            upper_bound = constraint_obj.get('UPPERBOUND')
+
+            from_event = constraint_obj.get('START')
+            to_event = constraint_obj.get('END')
+            constraint_id = constraint_obj.get('ID')
+            constraint_name = constraint_obj.get('NAME')
+
+            constraint = TemporalConstraint(constraint_id, constraint_name, tpnu.node_id_to_number[from_event], tpnu.node_id_to_number[to_event], lower_bound, upper_bound)
+
+            # check if the constraint is controllable and relaxable
+            type = constraint_obj.get('TYPE')
+
+            if "Controllable" in type:
+                constraint.controllable = True
+            elif "Uncontrollable" in type:
+                constraint.controllable = False
+
+            if constraint_obj.get('LBRELAXABLE') is not None:
+                if "T" in constraint_obj.get('LBRELAXABLE'):
+                    constraint.relaxable_lb = True
+                    lb_cost = constraint_obj.get('LB-RELAX-COST-RATIO')
+                    constraint.relax_cost_lb = float(lb_cost)
+
+            if constraint_obj.get('UBRELAXABLE') is not None:
+                if "T" in constraint_obj.get('UBRELAXABLE'):
+                    constraint.relaxable_ub = True
+                    ub_cost = constraint_obj.get('UB-RELAX-COST-RATIO')
+                    constraint.relax_cost_ub = float(ub_cost)
+
+            # Next we deal with the guard conditions
+            # the approach is identical to that for decision variables
+
+            for guard_obj in variable_obj.findall('GUARD'):
+                # guard_id = guard_obj.get('ID')
+                guard_variable_id = guard_obj.get('GUARD-VARIABLE')
+                guard_value = guard_obj.get('GUARD-VALUE')
+
+                # retrieve the assignment
+                guard_assignment = assignment_map[(guard_variable_id,guard_value)]
+                # and add to the guards of this decision variable
+                constraint.add_guard(guard_assignment)
+
+            tpnu.add_temporal_constraint(constraint)
+
+        return tpnu
+
+
+    @staticmethod
+    def writeCCTP(tpnu, outFilename):
+        f = open(outFilename, 'w')
+        f.write("""<?xml version="1.0" encoding="UTF-8"?>\r""")
+        tpnu.export(f,0)
+        f.close()
 
     @staticmethod
     def from_tpn_autogen(tpn):

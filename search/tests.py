@@ -19,7 +19,7 @@ class ParserTests(unittest.TestCase):
     # used in most of the tests.
     def assert_kirk_result(self, example_file, expected_result):
         for solver in DynamicControllability.SOLVERS:
-            obj = Tpn.parse(join(self.examples_dir, example_file))
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
             tpnu = Tpnu.from_tpn_autogen(obj)
             search_problem = SearchProblem(tpnu)
             search_problem.initialize()

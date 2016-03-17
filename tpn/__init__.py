@@ -33,7 +33,7 @@ from tpn import tpn_autogen
 # It will return a
 class Tpn(object):
     @staticmethod
-    def parse(inFilename):
+    def parseTPN(inFilename):
         tpns = tpn_autogen.parse(inFilename,silence=True)
         if len(tpns.get_tpn()) > 1:
             raise Exception("Only one tpn per file supported (for now)")
@@ -41,7 +41,7 @@ class Tpn(object):
         return obj
 
     @staticmethod
-    def write(tpn, outFilename):
+    def writeTPN(tpn, outFilename):
         f = open(outFilename, 'w')
         f.write("""<?xml version="1.0" encoding="UTF-8"?>\r""")
         tpn.export(f,0)

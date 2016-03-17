@@ -14,7 +14,7 @@ class ParserTests(unittest.TestCase):
 
     def assert_dc_result(self, example_file, expected_result):
         for solver in DynamicControllability.SOLVERS:
-            obj = Tpn.parse(join(self.examples_dir, example_file))
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
             conflict = DynamicControllability.check(obj, solver=solver)
             is_dynamically_controllable = conflict is None
             self.assertEqual(is_dynamically_controllable, expected_result)
