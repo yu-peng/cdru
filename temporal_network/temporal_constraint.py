@@ -37,3 +37,11 @@ class TemporalConstraint(object):
             return self.upper_bound
         else:
             return self.relaxed_ub
+
+    def pretty_print(self):
+
+        expression_str = []
+
+        expression_str.append('(%s:%s->%s)[%.4f,%.4f]' % (self.name, self.fro, self.to, self.lower_bound, self.upper_bound))
+
+        print(''.join(expression_str))

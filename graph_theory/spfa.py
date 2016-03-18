@@ -1,6 +1,6 @@
 from collections import deque
 
-def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-9):
+def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-6):
     """Shortest Paths Fastests Algorithm - think optimized Bellman-Ford,
 
         Assumes nodes have numbers from 0 to num_nodes (inclusive).
@@ -27,9 +27,11 @@ def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-9):
         node = q.popleft()
         currently_in_queue[node] = False
         for neighbor in neighbor_list[node]:
+
             if (distance[neighbor] is None or
                         distance[neighbor] > distance[node] + weights[(node, neighbor)] + epsilon):
                 predecessor[neighbor] = node
+
                 distance[neighbor] = distance[node] + weights[(node, neighbor)]
                 if not currently_in_queue[neighbor]:
                     currently_in_queue[neighbor] = True
@@ -59,7 +61,7 @@ def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-9):
                 # simple path.
                 if predecessor[potential_cycle_node] in potential_cycle:
                     cycle_start_index = potential_cycle.index(predecessor[potential_cycle_node])
-                    negative_cycle =  list(reversed(potential_cycle[cycle_start_index:]))
+                    negative_cycle = list(reversed(potential_cycle[cycle_start_index:]))
                     break
                 visited[node] = True
 

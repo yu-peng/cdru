@@ -30,10 +30,26 @@ class Tpnu(object):
                 constraint.activated = True
 
     @staticmethod
+    def isCCTP(inFilename):
+        e = xml.etree.ElementTree.parse(inFilename).getroot()
+        if "CCTP" in e.tag:
+            return True
+
+        return False
+
+    @staticmethod
+    def isTPN(inFilename):
+        e = xml.etree.ElementTree.parse(inFilename).getroot()
+        if "tpn" in e.tag:
+            return True
+
+        return False
+
+    @staticmethod
     def parseCCTP(inFilename):
         e = xml.etree.ElementTree.parse(inFilename).getroot()
 
-        tpnu_name = e.get('NAME')
+        tpnu_name = e.find('NAME').text
         tpnu = Tpnu('', tpnu_name)
 
         # In TPN format every node (or event in TPN terminology) has a non-unique name
@@ -47,7 +63,7 @@ class Tpnu(object):
         tpnu.node_id_to_number = {}
 
         for event_obj in e.findall('EVENT'):
-            eid, ename = event_obj.get('ID'), event_obj.get('NAME')
+            eid, ename = event_obj.find('ID').text, event_obj.find('NAME').text
             event_ids.add(eid)
             tpnu.node_id_to_name[eid] = ename
 
@@ -58,19 +74,22 @@ class Tpnu(object):
 
         tpnu.num_nodes = len(tpnu.node_number_to_id)
 
+        if (tpnu.num_nodes < 1):
+            return None
+
         # parse the decision variables
         assignment_map = {}
 
         for variable_obj in e.findall('DECISION-VARIABLE'):
-            dv_id = variable_obj.get('ID')
-            dv_name = variable_obj.get('NAME')
+            dv_id = variable_obj.find('ID').text
+            dv_name = variable_obj.find('DECISION-NAME').text
             decision_variable = DecisionVariable(dv_id,dv_name)
 
             # construct the assignment for the variable
             for value_obj in variable_obj.findall('VALUE'):
-                # value_id = value_obj.get('ID')
-                value_name = value_obj.get('VALUE-NAME')
-                value_utility = value_obj.get('VALUE-UTILITY')
+                # value_id = value_obj.find('ID').text
+                value_name = value_obj.find('VALUE-NAME').text
+                value_utility = float(value_obj.find('VALUE-UTILITY').text)
                 assignment = Assignment(decision_variable, value_name, value_utility)
 
                 # add the assignment to the variable, and a dictionary for future reference
@@ -83,15 +102,15 @@ class Tpnu(object):
 
         # parse variables' guards
         for variable_obj in e.findall('DECISION-VARIABLE'):
-            dv_id = variable_obj.get('ID')
+            dv_id = variable_obj.find('ID').text
             decision_variable = tpnu.decision_variables[dv_id]
 
             # the guard could be a conjunctive set of assignment
 
             for guard_obj in variable_obj.findall('GUARD'):
-                # guard_id = guard_obj.get('ID')
-                guard_variable_id = guard_obj.get('GUARD-VARIABLE')
-                guard_value = guard_obj.get('GUARD-VALUE')
+                # guard_id = guard_obj.find('ID').text
+                guard_variable_id = guard_obj.find('GUARD-VARIABLE').text
+                guard_value = guard_obj.find('GUARD-VALUE').text
 
                 # retrieve the assignment
                 guard_assignment = assignment_map[(guard_variable_id,guard_value)]
@@ -107,48 +126,50 @@ class Tpnu(object):
             # here we are only handling the first two cases, which are sorted into two lists
             # in our resulting stnu class.
 
-            lower_bound = constraint_obj.get('LOWERBOUND')
-            upper_bound = constraint_obj.get('UPPERBOUND')
+            lower_bound = float(constraint_obj.find('LOWERBOUND').text)
+            upper_bound = float(constraint_obj.find('UPPERBOUND').text)
 
-            from_event = constraint_obj.get('START')
-            to_event = constraint_obj.get('END')
-            constraint_id = constraint_obj.get('ID')
-            constraint_name = constraint_obj.get('NAME')
+            from_event = constraint_obj.find('START').text
+            to_event = constraint_obj.find('END').text
+            constraint_id = constraint_obj.find('ID').text
+            constraint_name = constraint_obj.find('NAME').text
 
             constraint = TemporalConstraint(constraint_id, constraint_name, tpnu.node_id_to_number[from_event], tpnu.node_id_to_number[to_event], lower_bound, upper_bound)
 
             # check if the constraint is controllable and relaxable
-            type = constraint_obj.get('TYPE')
+            type = constraint_obj.find('TYPE').text
 
             if "Controllable" in type:
                 constraint.controllable = True
             elif "Uncontrollable" in type:
                 constraint.controllable = False
 
-            if constraint_obj.get('LBRELAXABLE') is not None:
-                if "T" in constraint_obj.get('LBRELAXABLE'):
+            if constraint_obj.find('LBRELAXABLE') is not None:
+                if "T" in constraint_obj.find('LBRELAXABLE').text:
                     constraint.relaxable_lb = True
-                    lb_cost = constraint_obj.get('LB-RELAX-COST-RATIO')
+                    lb_cost = constraint_obj.find('LB-RELAX-COST-RATIO').text
                     constraint.relax_cost_lb = float(lb_cost)
 
-            if constraint_obj.get('UBRELAXABLE') is not None:
-                if "T" in constraint_obj.get('UBRELAXABLE'):
+            if constraint_obj.find('UBRELAXABLE') is not None:
+                if "T" in constraint_obj.find('UBRELAXABLE').text:
                     constraint.relaxable_ub = True
-                    ub_cost = constraint_obj.get('UB-RELAX-COST-RATIO')
+                    ub_cost = constraint_obj.find('UB-RELAX-COST-RATIO').text
                     constraint.relax_cost_ub = float(ub_cost)
 
             # Next we deal with the guard conditions
             # the approach is identical to that for decision variables
 
-            for guard_obj in variable_obj.findall('GUARD'):
-                # guard_id = guard_obj.get('ID')
-                guard_variable_id = guard_obj.get('GUARD-VARIABLE')
-                guard_value = guard_obj.get('GUARD-VALUE')
+            for guard_obj in constraint_obj.findall('GUARD'):
+                # guard_id = guard_obj.find('ID').text
+                guard_variable_id = guard_obj.find('GUARD-VARIABLE').text
+                guard_value = guard_obj.find('GUARD-VALUE').text
 
                 # retrieve the assignment
                 guard_assignment = assignment_map[(guard_variable_id,guard_value)]
                 # and add to the guards of this decision variable
                 constraint.add_guard(guard_assignment)
+
+
 
             tpnu.add_temporal_constraint(constraint)
 

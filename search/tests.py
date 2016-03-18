@@ -11,16 +11,25 @@ from temporal_network.decision_variable import DecisionVariable
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.assignment import Assignment
 
-class ParserTests(unittest.TestCase):
+class SearchTests(unittest.TestCase):
     def setUp(self):
-        kirk_dir = dirname(__file__)
-        self.examples_dir = join(kirk_dir, join('..', 'examples'))
+        cdru_dir = dirname(__file__)
+        self.examples_dir = join(cdru_dir, join('..', 'examples'))
 
     # used in most of the tests.
-    def assert_kirk_result(self, example_file, expected_result):
+    def assert_cdru_result(self, example_file, expected_result):
         for solver in DynamicControllability.SOLVERS:
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-            tpnu = Tpnu.from_tpn_autogen(obj)
+
+            path = join(self.examples_dir, example_file)
+
+            if Tpnu.isCCTP(path):
+                tpnu = Tpnu.parseCCTP(path)
+            elif Tpnu.isTPN(path):
+                obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+                tpnu = Tpnu.from_tpn_autogen(obj)
+            else:
+                raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
             search_problem = SearchProblem(tpnu)
             search_problem.initialize()
 
@@ -37,50 +46,55 @@ class ParserTests(unittest.TestCase):
             is_feasible = solution is not None
             self.assertEqual(is_feasible, expected_result)
 
-    def test_kirk1(self):
-        self.assert_kirk_result('test1.tpn', True)
+    def test_cdru1(self):
+        self.assert_cdru_result('test1.tpn', True)
 
-    def test_kirk2(self):
-        self.assert_kirk_result('test2.tpn', True)
+    def test_cdru2(self):
+        self.assert_cdru_result('test2.tpn', True)
 
-    def test_kirk3(self):
-        self.assert_kirk_result('test3.tpn', True)
+    def test_cdru3(self):
+        self.assert_cdru_result('test3.tpn', True)
 
-    def test_kirk4(self):
-        self.assert_kirk_result('test4.tpn', True)
+    def test_cdru4(self):
+        self.assert_cdru_result('test4.tpn', True)
 
-    def test_kirk_zipcar1(self):
-        self.assert_kirk_result('Zipcar-1.tpn', True)
+    def test_cdru_zipcar1(self):
+        self.assert_cdru_result('Zipcar-1.tpn', True)
 
-    def test_kirk_zipcar2(self):
-        self.assert_kirk_result('Zipcar-2.tpn', True)
+    def test_cdru_zipcar2(self):
+        self.assert_cdru_result('Zipcar-2.tpn', True)
 
-    def test_kirk_zipcar3(self):
-        self.assert_kirk_result('Zipcar-3.tpn', True)
+    def test_cdru_zipcar3(self):
+        self.assert_cdru_result('Zipcar-3.tpn', True)
 
-    def test_kirk_zipcar4(self):
-        self.assert_kirk_result('Zipcar-4.tpn', True)
+    def test_cdru_zipcar4(self):
+        self.assert_cdru_result('Zipcar-4.tpn', True)
 
-    def test_kirk_zipcar5(self):
-        self.assert_kirk_result('Zipcar-5.tpn', True)
+    def test_cdru_zipcar5(self):
+        self.assert_cdru_result('Zipcar-5.tpn', True)
 
-    def test_kirk_zipcar6(self):
-        self.assert_kirk_result('Zipcar-6.tpn', True)
+    def test_cdru_zipcar6(self):
+        self.assert_cdru_result('Zipcar-6.tpn', True)
 
-    def test_kirk_zipcar7(self):
-        self.assert_kirk_result('Zipcar-7.tpn', True)
+    def test_cdru_zipcar7(self):
+        self.assert_cdru_result('Zipcar-7.tpn', True)
 
-    def test_kirk_zipcar8(self):
-        self.assert_kirk_result('Zipcar-8.tpn', True)
+    def test_cdru_zipcar8(self):
+        self.assert_cdru_result('Zipcar-8.tpn', True)
 
-    def test_kirk_zipcar9(self):
-        self.assert_kirk_result('Zipcar-9.tpn', True)
+    def test_cdru_zipcar9(self):
+        self.assert_cdru_result('Zipcar-9.tpn', True)
 
-    def test_kirk_zipcar10(self):
-        self.assert_kirk_result('Zipcar-10.tpn', True)
+    def test_cdru_zipcar10(self):
+        self.assert_cdru_result('Zipcar-10.tpn', True)
 
+    def test_bus_schedule1(self):
+        self.assert_cdru_result('Route1_2_1.cctp', True)
 
-    def test_kirk_zipcar11(self):
+    def test_bus_schedule2(self):
+        self.assert_cdru_result('Route1_2_2.cctp', True)
+
+    def test_cdru_zipcar11(self):
 
         # build a kirk problem
         # first create a Tpnu

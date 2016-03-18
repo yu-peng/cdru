@@ -17,9 +17,9 @@ class TemporalRelaxation(object):
 
     def pretty_print(self):
         if self.relaxed_lb is not None:
-            print(self.constraint.name + "(LB): "+ str(self.constraint.lower_bound) +" -> "+str(self.relaxed_lb))
+            print(self.constraint.name + "(LB): "+ str(self.constraint.lower_bound) +" -> "+str(self.relaxed_lb) + "(" + str(self.constraint.get_lower_bound()) + ")")
 
         if self.relaxed_ub is not None:
-            print(self.constraint.name + "(UB): "+ str(self.constraint.upper_bound) +" -> "+str(self.relaxed_ub))
+            print(self.constraint.name + "(UB): "+ str(self.constraint.upper_bound) +" -> "+str(self.relaxed_ub) + "(" + str(self.constraint.get_upper_bound()) + ")")
 
 

@@ -13,12 +13,12 @@ class DynamicControllability(object):
             alg = MorrisN4Dc()
             if type(network) == ParseTpnClass:
                 network = Tpnu.from_tpn_autogen(network)
-                network.initialize()
             elif type(network) == Tpnu:
                 pass
             else:
                 raise Exception("Wrong type of network passed to dc checking")
 
+            network.initialize()
             return alg.check(network)
 
         else:

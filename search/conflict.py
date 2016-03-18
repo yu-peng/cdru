@@ -63,9 +63,9 @@ class Conflict(object):
                     expression_str.append(MINUS)
 
                 if bound == 0:
-                    expression_str.append('%d%s(%s)' % (abs(coefficient), 'LB', constraint.name))
+                    expression_str.append('%d%s(%s:%s->%s)[%.4f,%.4f]' % (abs(coefficient), 'LB', constraint.name, constraint.fro, constraint.to, constraint.lower_bound, constraint.upper_bound))
                 elif bound == 1:
-                    expression_str.append('%d%s(%s)' % (abs(coefficient), 'UB', constraint.name))
+                    expression_str.append('%d%s(%s:%s->%s)[%.4f,%.4f]' % (abs(coefficient), 'UB', constraint.name, constraint.fro, constraint.to, constraint.lower_bound, constraint.upper_bound))
 
             print(''.join(expression_str))
 

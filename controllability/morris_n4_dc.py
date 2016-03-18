@@ -49,12 +49,16 @@ class MorrisN4Dc(object):
 
             ub_edge = DistanceGraphEdge(fro, to, ub, EdgeType.SIMPLE, renaming=renaming)
             lb_edge = DistanceGraphEdge(to, fro, -lb, EdgeType.SIMPLE, renaming=renaming)
-            self.edge_support[ub_edge] = EdgeSupport.base({
-                                                             (EdgeSupport.UPPER, edge_id): 1,
-                                                          })
-            self.edge_support[lb_edge] = EdgeSupport.base({
-                                                              (EdgeSupport.LOWER, edge_id): -1,
-                                                          })
+            if edge_id is not None:
+                self.edge_support[ub_edge] = EdgeSupport.base({
+                                                                 (EdgeSupport.UPPER, edge_id): 1,
+                                                              })
+                self.edge_support[lb_edge] = EdgeSupport.base({
+                                                                  (EdgeSupport.LOWER, edge_id): -1,
+                                                              })
+            else:
+                self.edge_support[ub_edge] = EdgeSupport.base({})
+                self.edge_support[lb_edge] = EdgeSupport.base({})
 
             if not math.isinf(ub):
                 edge_list.append(ub_edge)
@@ -114,17 +118,28 @@ class MorrisN4Dc(object):
 
 
         K = 0
+        encoded_node_pairs = {}
         for e in network.temporal_constraints.values():
             # We only consider constraints that are active
             if e.activated:
                 if e.fro == 0 or e.to == 0:
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
                 if e.controllable:
-                    add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
+                    # Make sure no two edges share the same from and to nodes
+                    if (e.fro,e.to) in encoded_node_pairs:
+                        add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
+                        encoded_node_pairs[(e.fro,e.to)] = True
+                    else:
+                        new_node = num_nodes + 1
+                        num_nodes += 1
+                        renaming[new_node] = renaming[e.to] + "'"
+                        add_controllable(e.fro,new_node,e.get_lower_bound(),e.get_upper_bound(),e.id)
+                        add_controllable(new_node,e.to,0,0,None)
                 else:
                     K += 1
                     if e.lower_bound == 0:
                         add_uncontrollable(e.fro,None,e.to,e.get_lower_bound(),e.get_upper_bound(), e.id)
+                        encoded_node_pairs[(e.fro,e.to)] = True
                     else:
                         # contingent edges with bounds [l, u] can be normalized to edge
                         # can be replaced by requirement edge [l,l] followed by upper case edge
@@ -171,6 +186,8 @@ class MorrisN4Dc(object):
             edges_on_cycle = []
             for fro, to in zip(negative_cycle, negative_cycle[1:] + negative_cycle[:1]):
                 edges_on_cycle.append(spfa_graph_to_distance_graph[(fro, to)])
+
+            # print('Cycle size: ' + str(len(edges_on_cycle)))
 
         return (distances, edges_on_cycle)
 
@@ -220,7 +237,10 @@ class MorrisN4Dc(object):
 
         new_edge = DistanceGraphEdge(new_fro, new_to, new_value, new_type, new_maybe_letter, renaming=edge1.renaming)
         self.edge_support[new_edge] = EdgeSupport.derived(edge1, edge2)
-        #print 'combine \t%s \twith \t%s \tto get \t%s' %(edge1, edge2, new_edge)
+        # if (new_edge.fro == new_edge.to and new_edge.value < 0):
+        #     print('combine \t%s \twith \t%s \tto get \t%s' %(edge1, edge2, new_edge))
+        #     return None
+
         return new_edge
 
 
@@ -297,12 +317,18 @@ class MorrisN4Dc(object):
 
                             self.moat_edges.add(relevant_edge)
 
+                            # return immediately if an edge with the same from and to
+                            # and has negative value is detected. Since it itself is already
+                            # a negative cycle.
+                            if (relevant_edge.fro == relevant_edge.to and relevant_edge.value < 0):
+                                return relevant_edge
+
         #for edge in list(new_edges):
         #    print '   %s' % (edge,)
 
         return list(new_edges)
 
-    def extract_conflict(self, edge_list):
+    def extract_conflict(self, edge_list, include_combined=True):
         conflicts = []
         expression_cache = {}
 
@@ -337,7 +363,8 @@ class MorrisN4Dc(object):
         #        and edges on reductions of those edges (as well as reductions of
         #        edges on reductions and so on...)
         big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
-        conflicts.append(big_conflict)
+        if include_combined:
+            conflicts.append(big_conflict)
 
         return conflicts
 
@@ -418,6 +445,11 @@ class MorrisN4Dc(object):
                                                            all_edges,
                                                            potentials,
                                                            e)
+
+                    if type(reduced_edges) is DistanceGraphEdge:
+                        potential_conflict = self.extract_conflict([reduced_edges],include_combined=False)
+                        return potential_conflict
+
                     new_edges.extend(reduced_edges)
             completed_iterations += 1
 

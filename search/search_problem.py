@@ -90,6 +90,9 @@ class SearchProblem(object):
 
                     if new_conflict is not None:
 
+                        # if (len(new_conflict.negative_cycles) > 1):
+                        #     break
+
                         # if inconsistent, extract and record a conflict,
                         self.known_conflicts.add(new_conflict)
 
@@ -315,7 +318,8 @@ class SearchProblem(object):
                         if relaxed_bound <= constraint.lower_bound:
                             # yes! create a new relaxation for it
                             relaxation = TemporalRelaxation(constraint)
-                            relaxation.relaxed_lb = relaxed_bound - 0.001
+                            relaxation.relaxed_lb = relaxed_bound
+                            # relaxation.pretty_print()
                             relaxations.append(relaxation)
 
                     elif bound == 1:
@@ -323,7 +327,8 @@ class SearchProblem(object):
                         if relaxed_bound >= constraint.upper_bound:
                             # yes! create a new relaxation for it
                             relaxation = TemporalRelaxation(constraint)
-                            relaxation.relaxed_ub = relaxed_bound + 0.001
+                            relaxation.relaxed_ub = relaxed_bound
+                            # relaxation.pretty_print()
                             relaxations.append(relaxation)
 
                 if len(relaxations) > 0:
@@ -332,7 +337,7 @@ class SearchProblem(object):
 
                     if new_candidate is not None:
                         new_candidate.resolved_conflicts.add(conflict)
-                        new_candidate.continuously_resolved_cycles.add(cycle)
+                        new_candidate.continuously_resolved_cycles.add(negative_cycle)
                         self.add_candidate_to_queue(new_candidate)
 
     def check_complete(self,candidate):
@@ -423,6 +428,7 @@ class SearchProblem(object):
     def consistent(self,candidate):
         # Check if this candidate results
         # in a consistent temporal network
+        # print('------Consistency check')
 
         self.implement(candidate)
 
@@ -438,7 +444,10 @@ class SearchProblem(object):
         else:
             # reformat the conflict
             kirk_conflict = Conflict()
+            # print(str(len(conflict)) + ' cycles detected')
             kirk_conflict.add_negative_cycles(conflict,self.tpnu)
+
+            # kirk_conflict.pretty_print()
             return kirk_conflict
 
     def implement(self,candidate):
