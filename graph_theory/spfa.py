@@ -1,6 +1,6 @@
 from collections import deque
 
-def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-6):
+def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-4):
     """Shortest Paths Fastests Algorithm - think optimized Bellman-Ford,
 
         Assumes nodes have numbers from 0 to num_nodes (inclusive).

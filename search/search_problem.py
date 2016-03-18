@@ -4,7 +4,7 @@ from queue import PriorityQueue
 from search.candidate import Candidate
 from controllability.dynamic_controllability import DynamicControllability
 from search.conflict import Conflict
-from pulp import *
+from pulp import solvers, LpProblem, LpMinimize, LpVariable, value
 from search.temporal_relaxation import TemporalRelaxation
 
 class SearchProblem(object):
@@ -295,7 +295,12 @@ class SearchProblem(object):
                 # print("OBJ: ", prob.objective)
 
                 # Solve the problem
-                status = prob.solve()
+                try:
+                    import gurobipy
+                    status = prob.solve(solvers.GUROBI(mip=False,msg=False))
+                except ImportError:
+                    pass # Gurobi doesn't exist, use default Pulp solver.
+                    status = prob.solve()
 
                 # exit(0);
 
