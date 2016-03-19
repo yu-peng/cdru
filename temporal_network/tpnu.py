@@ -78,11 +78,17 @@ class Tpnu(object):
             return None
 
         # parse the decision variables
-        assignment_map = {}
+        assignment_map_with_id = {}
+        assignment_map_with_name = {}
 
         for variable_obj in e.findall('DECISION-VARIABLE'):
-            dv_id = variable_obj.find('ID').text
             dv_name = variable_obj.find('DECISION-NAME').text
+
+            if variable_obj.find('ID') is not None:
+                dv_id = variable_obj.find('ID').text
+            else:
+                dv_id = dv_name
+
             decision_variable = DecisionVariable(dv_id,dv_name)
 
             # construct the assignment for the variable
@@ -96,24 +102,33 @@ class Tpnu(object):
                 decision_variable.add_domain_value(assignment)
 
                 # using the id of the variable and the value of the assignment as key
-                assignment_map[(dv_id,value_name)] = assignment
+                assignment_map_with_id[(dv_id,value_name)] = assignment
+                assignment_map_with_name[(dv_name,value_name)] = assignment
 
             tpnu.add_decision_variable(decision_variable)
 
         # parse variables' guards
         for variable_obj in e.findall('DECISION-VARIABLE'):
-            dv_id = variable_obj.find('ID').text
+
+            if variable_obj.find('ID') is not None:
+                dv_id = variable_obj.find('ID').text
+            else:
+                dv_id = variable_obj.find('DECISION-NAME').text
+
             decision_variable = tpnu.decision_variables[dv_id]
 
             # the guard could be a conjunctive set of assignment
 
             for guard_obj in variable_obj.findall('GUARD'):
                 # guard_id = guard_obj.find('ID').text
-                guard_variable_id = guard_obj.find('GUARD-VARIABLE').text
+                guard_variable = guard_obj.find('GUARD-VARIABLE').text
                 guard_value = guard_obj.find('GUARD-VALUE').text
 
                 # retrieve the assignment
-                guard_assignment = assignment_map[(guard_variable_id,guard_value)]
+                if (guard_variable,guard_value) in assignment_map_with_id:
+                    guard_assignment = assignment_map_with_id[(guard_variable,guard_value)]
+                elif (guard_variable,guard_value) in assignment_map_with_name:
+                    guard_assignment = assignment_map_with_name[(guard_variable,guard_value)]
                 # and add to the guards of this decision variable
                 decision_variable.add_guard(guard_assignment)
 
@@ -161,11 +176,14 @@ class Tpnu(object):
 
             for guard_obj in constraint_obj.findall('GUARD'):
                 # guard_id = guard_obj.find('ID').text
-                guard_variable_id = guard_obj.find('GUARD-VARIABLE').text
+                guard_variable = guard_obj.find('GUARD-VARIABLE').text
                 guard_value = guard_obj.find('GUARD-VALUE').text
 
                 # retrieve the assignment
-                guard_assignment = assignment_map[(guard_variable_id,guard_value)]
+                if (guard_variable,guard_value) in assignment_map_with_id:
+                    guard_assignment = assignment_map_with_id[(guard_variable,guard_value)]
+                elif (guard_variable,guard_value) in assignment_map_with_name:
+                    guard_assignment = assignment_map_with_name[(guard_variable,guard_value)]
                 # and add to the guards of this decision variable
                 constraint.add_guard(guard_assignment)
 

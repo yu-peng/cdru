@@ -58,35 +58,11 @@ class SearchTests(unittest.TestCase):
     def test_cdru4(self):
         self.assert_cdru_result('test4.tpn', True)
 
-    def test_cdru_zipcar1(self):
-        self.assert_cdru_result('Zipcar-1.tpn', True)
+    def test_bus_whoi1(self):
+        self.assert_cdru_result('whoi-1.cctp', True)
 
-    def test_cdru_zipcar2(self):
-        self.assert_cdru_result('Zipcar-2.tpn', True)
-
-    def test_cdru_zipcar3(self):
-        self.assert_cdru_result('Zipcar-3.tpn', True)
-
-    def test_cdru_zipcar4(self):
-        self.assert_cdru_result('Zipcar-4.tpn', True)
-
-    def test_cdru_zipcar5(self):
-        self.assert_cdru_result('Zipcar-5.tpn', True)
-
-    def test_cdru_zipcar6(self):
-        self.assert_cdru_result('Zipcar-6.tpn', True)
-
-    def test_cdru_zipcar7(self):
-        self.assert_cdru_result('Zipcar-7.tpn', True)
-
-    def test_cdru_zipcar8(self):
-        self.assert_cdru_result('Zipcar-8.tpn', True)
-
-    def test_cdru_zipcar9(self):
-        self.assert_cdru_result('Zipcar-9.tpn', True)
-
-    def test_cdru_zipcar10(self):
-        self.assert_cdru_result('Zipcar-10.tpn', True)
+    def test_bus_whoi2(self):
+        self.assert_cdru_result('whoi-2.cctp', True)
 
     def test_bus_schedule1(self):
         self.assert_cdru_result('Route1_2_1.cctp', True)
@@ -94,7 +70,61 @@ class SearchTests(unittest.TestCase):
     def test_bus_schedule2(self):
         self.assert_cdru_result('Route1_2_2.cctp', True)
 
-    def test_cdru_zipcar11(self):
+    def test_bus_selection1(self):
+        self.assert_cdru_result('bus-1.cctp', True)
+
+    def test_bus_selection2(self):
+        self.assert_cdru_result('bus-1.cctp', True)
+
+    def test_bus_selection3(self):
+        self.assert_cdru_result('bus-1.cctp', True)
+
+    def test_bus_selection4(self):
+        self.assert_cdru_result('bus-1.cctp', True)
+
+    def test_cctp_zipcar1(self):
+        self.assert_cdru_result('Zipcar-1.cctp', True)
+
+    def test_cctp_zipcar2(self):
+        self.assert_cdru_result('Zipcar-2.cctp', True)
+
+    def test_cctp_zipcar3(self):
+        self.assert_cdru_result('Zipcar-3.cctp', True)
+
+    def test_cctp_zipcar4(self):
+        self.assert_cdru_result('Zipcar-4.cctp', True)
+
+    def test_tpn_zipcar1(self):
+        self.assert_cdru_result('Zipcar-1.tpn', True)
+
+    def test_tpn_zipcar2(self):
+        self.assert_cdru_result('Zipcar-2.tpn', True)
+
+    def test_tpn_zipcar3(self):
+        self.assert_cdru_result('Zipcar-3.tpn', True)
+
+    def test_tpn_zipcar4(self):
+        self.assert_cdru_result('Zipcar-4.tpn', True)
+
+    def test_tpn_zipcar5(self):
+        self.assert_cdru_result('Zipcar-5.tpn', True)
+
+    def test_tpn_zipcar6(self):
+        self.assert_cdru_result('Zipcar-6.tpn', True)
+
+    def test_tpn_zipcar7(self):
+        self.assert_cdru_result('Zipcar-7.tpn', True)
+
+    def test_tpn_zipcar8(self):
+        self.assert_cdru_result('Zipcar-8.tpn', True)
+
+    def test_tpn_zipcar9(self):
+        self.assert_cdru_result('Zipcar-9.tpn', True)
+
+    def test_tpn_zipcar10(self):
+        self.assert_cdru_result('Zipcar-10.tpn', True)
+
+    def test_tpn_zipcar11(self):
 
         # build a kirk problem
         # first create a Tpnu
