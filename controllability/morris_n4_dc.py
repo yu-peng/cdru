@@ -164,9 +164,9 @@ class MorrisN4Dc(object):
         for e in edge_list:
             if e.edge_type != EdgeType.LOWER_CASE:
                 pair = (e.fro, e.to)
-                spfa_graph_to_distance_graph[pair] = e
-                neighbor_list[e.fro].add(e.to)
                 if (pair not in weights) or (weights[pair] > e.value):
+                    spfa_graph_to_distance_graph[pair] = e
+                    neighbor_list[e.fro].add(e.to)
                     weights[pair] = e.value
 
         # Like in Johnson's algorithm we add node 0 artificially
@@ -184,10 +184,17 @@ class MorrisN4Dc(object):
         if negative_cycle is not None:
             assert(0 not in negative_cycle)
             edges_on_cycle = []
+            nvalue = 0
+            # print('---- to edge ')
             for fro, to in zip(negative_cycle, negative_cycle[1:] + negative_cycle[:1]):
-                edges_on_cycle.append(spfa_graph_to_distance_graph[(fro, to)])
+                edge = spfa_graph_to_distance_graph[(fro, to)]
+                edges_on_cycle.append(edge)
+                nvalue += edge.value
+                # print(str(fro) + '->' + str(to) + ':' + str(edge.value))
+            # print('Cycle size: ' + str(len(edges_on_cycle)) + ' with value ' + str(nvalue))
 
-            # print('Cycle size: ' + str(len(edges_on_cycle)))
+            if nvalue > 0:
+                raise Exception('Positive cycle value detected!');
 
         return (distances, edges_on_cycle)
 
@@ -340,20 +347,27 @@ class MorrisN4Dc(object):
                     result[base_expression] += coefficient
             return result
 
-        def get_edge_expression(edge):
+        def get_edge_expression(edge,neg_value):
             if edge not in expression_cache:
+
                 if self.edge_support[edge].type == EdgeSupport.BASE:
                     expression_cache[edge] = self.edge_support[edge].expression
                 else:
+                    # Check if the current edge is a moat and provides a tighter bound
+                    if edge in self.moat_edges and edge.value > neg_value:
+                        new_neg_value = edge.value
+                    else:
+                        new_neg_value = neg_value
+
                     expression_cache[edge] = combine_expressions(
-                        [get_edge_expression(parent) for parent in self.edge_support[edge].parents]
+                        [get_edge_expression(parent,new_neg_value) for parent in self.edge_support[edge].parents]
                     )
                 # each edge only gets it's cache to be computed once
                 # so we will only add expression for the edge one time
                 # assuming the same edge does not appear represented
                 # by different objects. This should not happen, but
                 # hopefully this comment confused you at least a little.
-                if edge in self.moat_edges:
+                if edge in self.moat_edges and edge.value > neg_value:
                     conflicts.append(expression_cache[edge])
             return expression_cache[edge]
 
@@ -362,9 +376,18 @@ class MorrisN4Dc(object):
         #     2) It trigers conflict calculations for all the edge on that cycle
         #        and edges on reductions of those edges (as well as reductions of
         #        edges on reductions and so on...)
-        big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
+
+        neg_value = 0
+        for edge in edge_list:
+            neg_value += edge.value
+
         if include_combined:
+            # print('NValue: ' + str(neg_value))
+            big_conflict = combine_expressions([get_edge_expression(edge,neg_value) for edge in edge_list])
             conflicts.append(big_conflict)
+        else:
+            # print('Nedge: ' + str(neg_value))
+            combine_expressions([get_edge_expression(edge,-100000) for edge in edge_list])
 
         return conflicts
 

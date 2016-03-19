@@ -53,6 +53,7 @@ def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-4):
                 potential_cycle_node = node
                 potential_cycle = []
                 while predecessor[potential_cycle_node] is not None and not visited[predecessor[potential_cycle_node]]:
+                    # print(str(predecessor[potential_cycle_node]) + '->' + str(potential_cycle_node) + ':' + str(weights[(predecessor[potential_cycle_node], potential_cycle_node)]))
                     potential_cycle_node = predecessor[potential_cycle_node]
                     potential_cycle.append(potential_cycle_node)
                     visited[potential_cycle_node] = True
@@ -60,6 +61,7 @@ def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-4):
                 # it is not necessary spanning the entire array (we could have "entered" on cycle through
                 # simple path.
                 if predecessor[potential_cycle_node] in potential_cycle:
+                    # print(str(predecessor[potential_cycle_node]) + '->' + str(potential_cycle_node) + ':' + str(weights[(predecessor[potential_cycle_node], potential_cycle_node)]))
                     cycle_start_index = potential_cycle.index(predecessor[potential_cycle_node])
                     negative_cycle = list(reversed(potential_cycle[cycle_start_index:]))
                     break

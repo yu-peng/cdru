@@ -92,7 +92,6 @@ class SearchProblem(object):
 
                         # if (len(new_conflict.negative_cycles) > 1):
                         #     break
-
                         # if inconsistent, extract and record a conflict,
                         self.known_conflicts.add(new_conflict)
 
@@ -320,7 +319,7 @@ class SearchProblem(object):
 
                     if bound == 0:
                         # check if this constraint bound is relaxed
-                        if relaxed_bound <= constraint.lower_bound:
+                        if relaxed_bound < constraint.lower_bound:
                             # yes! create a new relaxation for it
                             relaxation = TemporalRelaxation(constraint)
                             relaxation.relaxed_lb = relaxed_bound
@@ -329,7 +328,7 @@ class SearchProblem(object):
 
                     elif bound == 1:
                         # same for upper bound
-                        if relaxed_bound >= constraint.upper_bound:
+                        if relaxed_bound > constraint.upper_bound:
                             # yes! create a new relaxation for it
                             relaxation = TemporalRelaxation(constraint)
                             relaxation.relaxed_ub = relaxed_bound
@@ -437,7 +436,7 @@ class SearchProblem(object):
 
         self.implement(candidate)
 
-        # return either a conflict, or true
+        # return either a conflict, or None
         # run the dc checking algorithm
         # TODO: fix the conflict extraction code
         conflict = DynamicControllability.check(self.tpnu)
@@ -449,8 +448,8 @@ class SearchProblem(object):
         else:
             # reformat the conflict
             kirk_conflict = Conflict()
-            # print(str(len(conflict)) + ' cycles detected')
             kirk_conflict.add_negative_cycles(conflict,self.tpnu)
+            # kirk_conflict.pretty_print()
 
             # kirk_conflict.pretty_print()
             return kirk_conflict
