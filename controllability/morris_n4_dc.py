@@ -126,7 +126,7 @@ class MorrisN4Dc(object):
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
                 if e.controllable:
                     # Make sure no two edges share the same from and to nodes
-                    if (e.fro,e.to) in encoded_node_pairs:
+                    if (e.fro,e.to) not in encoded_node_pairs:
                         add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
                         encoded_node_pairs[(e.fro,e.to)] = True
                     else:
