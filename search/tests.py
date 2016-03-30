@@ -6,7 +6,7 @@ from os.path import join, dirname
 from tpn import Tpn
 from controllability.dynamic_controllability import DynamicControllability
 from temporal_network.tpnu import Tpnu
-from search.search_problem import SearchProblem
+from search.search_problem import SearchProblem, FeasibilityType, ObjectiveType
 from temporal_network.decision_variable import DecisionVariable
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.assignment import Assignment
@@ -30,7 +30,7 @@ class SearchTests(unittest.TestCase):
             else:
                 raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
 
-            search_problem = SearchProblem(tpnu)
+            search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
             search_problem.initialize()
 
             solution = search_problem.next_solution()

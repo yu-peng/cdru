@@ -1,6 +1,7 @@
 import unittest
 from os.path import join, dirname
 
+from controllability.temporal_consistency import TemporalConsistency
 from tpn import Tpn
 from temporal_network.tpnu import Tpnu
 from controllability.dynamic_controllability import DynamicControllability
@@ -63,6 +64,30 @@ class ControllabilityTests(unittest.TestCase):
         is_strongly_controllable = conflict is None
         self.assertEqual(is_strongly_controllable, expected_result)
 
+    def assert_consistency_result(self, example_file, expected_result):
+        path = join(self.examples_dir, example_file)
+
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
+        # for tc in tpnu.temporal_constraints:
+        #     tpnu.temporal_constraints[tc].pretty_print()
+
+        conflict = TemporalConsistency.check(tpnu)
+
+        # if conflict is not None:
+        #     kirk_conflict = Conflict()
+        #     kirk_conflict.add_negative_cycles(conflict,tpnu)
+        #     kirk_conflict.pretty_print()
+
+        is_strongly_controllable = conflict is None
+        self.assertEqual(is_strongly_controllable, expected_result)
+
     def test_dc(self):
         self.assert_dc_result('test1.tpn', True)
         self.assert_dc_result('test2.tpn', False)
@@ -80,6 +105,15 @@ class ControllabilityTests(unittest.TestCase):
         self.assert_sc_result('ControllabilityTest.tpn', False)
         self.assert_sc_result('Route1_2_1.cctp', False)
         self.assert_sc_result('Route1_2_2.cctp', False)
+
+    def test_consistency(self):
+        self.assert_consistency_result('test1.tpn', True)
+        self.assert_consistency_result('test2.tpn', True)
+        self.assert_consistency_result('test3.tpn', True)
+        self.assert_consistency_result('test4.tpn', True)
+        self.assert_consistency_result('ControllabilityTest.tpn', True)
+        self.assert_consistency_result('Route1_2_1.cctp', False)
+        self.assert_consistency_result('Route1_2_2.cctp', False)
 
     def test_nozeronode(self):
         with self.assertRaises(Exception):

@@ -1,3 +1,6 @@
+from controllability.strong_controllability import StrongControllability
+from controllability.temporal_consistency import TemporalConsistency
+
 __author__ = 'yupeng'
 
 from queue import PriorityQueue
@@ -7,13 +10,23 @@ from search.conflict import Conflict
 from pulp import solvers, LpProblem, LpMinimize, LpVariable, value
 from search.temporal_relaxation import TemporalRelaxation
 
+class FeasibilityType(object):
+    CONSISTENCY = 1
+    STRONG_CONTROLLABILITY = 2
+    DYNAMIC_CONTROLLABILITY = 3
+
+class ObjectiveType(object):
+    MIN_COST = 1
+    MIN_MAX_UNCERTAINTY = 2
+
 class SearchProblem(object):
 
-    def __init__(self, tpnu):
+    def __init__(self, tpnu, f_type, o_type):
         self.tpnu = tpnu
         self.queue = PriorityQueue()
         self.known_conflicts = set()
-
+        self.feasibility_type = f_type
+        self.objective_type = o_type
 
     def initialize(self):
         # clear the search state
@@ -439,7 +452,14 @@ class SearchProblem(object):
         # return either a conflict, or None
         # run the dc checking algorithm
         # TODO: fix the conflict extraction code
-        conflict = DynamicControllability.check(self.tpnu)
+        conflict = None
+
+        if self.feasibility_type == FeasibilityType.CONSISTENCY:
+            conflict = TemporalConsistency.check(self.tpnu)
+        elif self.feasibility_type == FeasibilityType.STRONG_CONTROLLABILITY:
+            conflict = StrongControllability.check(self.tpnu)
+        elif self.feasibility_type == FeasibilityType.STRONG_CONTROLLABILITY:
+            conflict = DynamicControllability.check(self.tpnu)
 
         # the conflict is a collection of dictionaries
         # each represents a negative cycle

@@ -7,10 +7,9 @@ from collections import defaultdict
 
 from graph_theory import spfa
 from controllability.distance_graph_edge import EdgeType, DistanceGraphEdge
-from controllability.temporal_consistency import EdgeSupport
 import math
 
-class StrongControllability(object):
+class TemporalConsistency(object):
 
     @staticmethod
     def check(network):
@@ -19,18 +18,17 @@ class StrongControllability(object):
         elif type(network) == Tpnu:
             pass
         else:
-            raise Exception("Wrong type of network passed to strong controllability checking")
+            raise Exception("Wrong type of network passed to temporal consistency checking")
 
         network.initialize()
-        alg = Vidal99Reduction()
+        alg = NrgativeCycleDetection()
 
         return alg.check(network)
 
-class Vidal99Reduction(object):
 
-    """Triangular reduction implementation based on paper "Handling
-contingency in temporal constraint networks: from
-consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
+class NrgativeCycleDetection(object):
+
+    """Negative Cycle Detection Implementation"""
 
     def __init__(self):
         self.edge_support = {}
@@ -63,7 +61,6 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             potential_conflict = conflict
 
         return potential_conflict
-
 
     def generate_graph_from_tpnu(self, network):
         """Generates distance graph from a tpnu"""
@@ -100,37 +97,6 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             # else:
             #     print("Ignoring -inf LB of " + e.id)
 
-        def add_uncontrollable(fro, to, lb, ub, edge_id):
-
-            # no negative lower bound
-            # no infinite upperbound
-            assert lb <= ub
-            assert not lb < 0
-            assert not math.isinf(ub)
-
-            ub_edge = DistanceGraphEdge(fro, to, ub, EdgeType.SIMPLE, renaming=renaming)
-            lb_edge = DistanceGraphEdge(to, fro, -lb, EdgeType.SIMPLE, renaming=renaming)
-
-            if edge_id is not None:
-                self.edge_support[ub_edge] = EdgeSupport.base({(EdgeSupport.UPPER, edge_id): 1,})
-                self.edge_support[lb_edge] = EdgeSupport.base({(EdgeSupport.LOWER, edge_id): -1,})
-            else:
-                self.edge_support[ub_edge] = EdgeSupport.base({})
-                self.edge_support[lb_edge] = EdgeSupport.base({})
-
-            #edge_list.append(ub_edge)
-            #edge_list.append(lb_edge)
-            #contingent_nodes.append(to)
-            if to in contingent_edges_at_node:
-                collection = contingent_edges_at_node[to]
-                collection.append(lb_edge)
-                collection.append(ub_edge)
-            else:
-                collection = []
-                collection.append(lb_edge)
-                collection.append(ub_edge)
-                contingent_edges_at_node[to] = collection
-
         encoded_node_pairs = {}
         # Encode initial edges
         for e in network.temporal_constraints.values():
@@ -138,61 +104,19 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             if e.activated:
                 if e.fro == 0 or e.to == 0:
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
-                if e.controllable:
-                    # Make sure no two edges share the same from and to nodes
-                    if (e.fro,e.to) not in encoded_node_pairs:
-                        add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
-                        encoded_node_pairs[(e.fro,e.to)] = True
-                    else:
-                        new_node = num_nodes + 1
-                        num_nodes += 1
-                        renaming[new_node] = renaming[e.to] + "'"
-                        add_controllable(e.fro,new_node,e.get_lower_bound(),e.get_upper_bound(),e.id)
-                        add_controllable(new_node,e.to,0,0,None)
+
+                # Make sure no two edges share the same from and to nodes
+                if (e.fro,e.to) not in encoded_node_pairs:
+                    add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
+                    encoded_node_pairs[(e.fro,e.to)] = True
                 else:
-                    # Make sure no two edges share the same from and to nodes
-                    if (e.fro,e.to) not in encoded_node_pairs:
-                        add_uncontrollable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
-                        encoded_node_pairs[(e.fro,e.to)] = True
-                    else:
-                        new_node = num_nodes + 1
-                        num_nodes += 1
-                        renaming[new_node] = renaming[e.to] + "'"
-                        add_uncontrollable(e.fro,new_node,e.get_lower_bound(),e.get_upper_bound(),e.id)
-                        add_controllable(new_node,e.to,0,0,None)
+                    new_node = num_nodes + 1
+                    num_nodes += 1
+                    renaming[new_node] = renaming[e.to] + "'"
+                    add_controllable(e.fro,new_node,e.get_lower_bound(),e.get_upper_bound(),e.id)
+                    add_controllable(new_node,e.to,0,0,None)
 
-        # Execute triangular reduction procedure on the edges
-        reduced_edges = []
-        for edge in edge_list:
-
-            new_edges = []
-
-            if edge.fro in contingent_edges_at_node:
-                contingent_edges = contingent_edges_at_node[edge.fro]
-                for contingent_edge in contingent_edges:
-                    if contingent_edge.fro == edge.fro:
-                        reduced_edge = DistanceGraphEdge(contingent_edge.to, edge.to, edge.value-contingent_edge.value, EdgeType.SIMPLE, renaming=renaming)
-                        self.edge_support[reduced_edge] = EdgeSupport.derived(edge, contingent_edge)
-                        new_edges.append(reduced_edge)
-                        # print("Reducing: " + str(edge) + " and " + str(contingent_edge))
-                        # print("Adding reduced from edge: " + str(reduced_edge.fro) + "->" + str(reduced_edge.to) + " (" + str(reduced_edge.value) + ")")
-            else:
-                new_edges.append(edge)
-
-            for new_edge in new_edges:
-                if new_edge.to in contingent_edges_at_node:
-                    contingent_edges = contingent_edges_at_node[edge.to]
-                    for contingent_edge in contingent_edges:
-                        if contingent_edge.to == edge.to:
-                            reduced_edge = DistanceGraphEdge(edge.fro, contingent_edge.fro, edge.value-contingent_edge.value, EdgeType.SIMPLE, renaming=renaming)
-                            self.edge_support[reduced_edge] = EdgeSupport.derived(edge, contingent_edge)
-                            reduced_edges.append(reduced_edge)
-                            # print("Reducing: " + str(new_edge) + " and " + str(contingent_edge))
-                            # print("Adding reduced to edge: " + str(reduced_edge.fro) + "->" + str(reduced_edge.to) + " (" + str(reduced_edge.value) + ")")
-                else:
-                    reduced_edges.append(new_edge)
-
-        return num_nodes, reduced_edges
+        return num_nodes, edge_list
 
     def consistent(self,num_nodes, edge_list):
         """Calculates consistency of reduced STNU.
@@ -286,3 +210,23 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             combine_expressions([get_edge_expression(edge,) for edge in edge_list])
 
         return conflicts
+
+class EdgeSupport(object):
+    BASE = 1
+    DERIVED = 2
+    UPPER = 1
+    LOWER = 2
+
+    @staticmethod
+    def base(expression):
+        es = EdgeSupport()
+        es.type = EdgeSupport.BASE
+        es.expression = expression
+        return es
+
+    @staticmethod
+    def derived(parent1, parent2):
+        es = EdgeSupport()
+        es.type = EdgeSupport.DERIVED
+        es.parents = [parent1, parent2]
+        return es

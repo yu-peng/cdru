@@ -3,27 +3,8 @@ from queue import PriorityQueue
 
 from graph_theory import spfa
 from controllability.distance_graph_edge import EdgeType, DistanceGraphEdge
+from controllability.temporal_consistency import EdgeSupport
 import math
-
-class EdgeSupport(object):
-    BASE = 1
-    DERIVED = 2
-    UPPER = 1
-    LOWER = 2
-
-    @staticmethod
-    def base(expression):
-        es = EdgeSupport()
-        es.type = EdgeSupport.BASE
-        es.expression = expression
-        return es
-
-    @staticmethod
-    def derived(parent1, parent2):
-        es = EdgeSupport()
-        es.type = EdgeSupport.DERIVED
-        es.parents = [parent1, parent2]
-        return es
 
 class MorrisN4Dc(object):
     """Implementation based on paper "A Structural Characterization of Temporal
