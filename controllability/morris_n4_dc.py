@@ -232,7 +232,7 @@ class MorrisN4Dc(object):
         return new_edge
 
 
-    def reduce_lower_case(self, num_nodes, edge_list, potentials, lc_edge):
+    def reduce_lower_case(self, num_nodes, edge_list, potentials, lc_edge, epsilon=10E-8):
         new_edges = set()
 
         # Notice that here we are going to be using Johnson's algorithm in
@@ -288,7 +288,7 @@ class MorrisN4Dc(object):
                     # potentials
                     real_reduced_distance = distance[neighbor] + potentials[neighbor] - potentials[source]
                     # check if we have a moat
-                    if real_reduced_distance < 0:
+                    if real_reduced_distance < 0 - epsilon:
                         relevant_edge = self.reduce_edge(lc_edge, reduced_edge[neighbor])
 
                         if relevant_edge is not None:
@@ -328,27 +328,23 @@ class MorrisN4Dc(object):
                     result[base_expression] += coefficient
             return result
 
-        def get_edge_expression(edge,neg_value):
+        def get_edge_expression(edge):
             if edge not in expression_cache:
 
                 if self.edge_support[edge].type == EdgeSupport.BASE:
                     expression_cache[edge] = self.edge_support[edge].expression
                 else:
                     # Check if the current edge is a moat and provides a tighter bound
-                    if edge in self.moat_edges and edge.value > neg_value:
-                        new_neg_value = edge.value
-                    else:
-                        new_neg_value = neg_value
 
                     expression_cache[edge] = combine_expressions(
-                        [get_edge_expression(parent,new_neg_value) for parent in self.edge_support[edge].parents]
+                        [get_edge_expression(parent) for parent in self.edge_support[edge].parents]
                     )
                 # each edge only gets it's cache to be computed once
                 # so we will only add expression for the edge one time
                 # assuming the same edge does not appear represented
                 # by different objects. This should not happen, but
                 # hopefully this comment confused you at least a little.
-                if edge in self.moat_edges and edge.value > neg_value:
+                if edge in self.moat_edges:
                     conflicts.append(expression_cache[edge])
             return expression_cache[edge]
 
@@ -358,17 +354,13 @@ class MorrisN4Dc(object):
         #        and edges on reductions of those edges (as well as reductions of
         #        edges on reductions and so on...)
 
-        neg_value = 0
-        for edge in edge_list:
-            neg_value += edge.value
-
         if include_combined:
             # print('NValue: ' + str(neg_value))
-            big_conflict = combine_expressions([get_edge_expression(edge,neg_value) for edge in edge_list])
+            big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
             conflicts.append(big_conflict)
         else:
             # print('Nedge: ' + str(neg_value))
-            combine_expressions([get_edge_expression(edge,-100000) for edge in edge_list])
+            combine_expressions([get_edge_expression(edge) for edge in edge_list])
 
         return conflicts
 

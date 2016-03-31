@@ -7,7 +7,7 @@ from queue import PriorityQueue
 from search.candidate import Candidate
 from controllability.dynamic_controllability import DynamicControllability
 from search.conflict import Conflict
-from pulp import solvers, LpProblem, LpMinimize, LpVariable, value
+from pulp import solvers, LpProblem, LpMinimize, LpVariable, value, LpMaximize
 from search.temporal_relaxation import TemporalRelaxation
 
 class FeasibilityType(object):
@@ -17,7 +17,7 @@ class FeasibilityType(object):
 
 class ObjectiveType(object):
     MIN_COST = 1
-    MIN_MAX_UNCERTAINTY = 2
+    MAX_FLEX_UNCERTAINTY = 2
 
 class SearchProblem(object):
 
@@ -27,6 +27,16 @@ class SearchProblem(object):
         self.known_conflicts = set()
         self.feasibility_type = f_type
         self.objective_type = o_type
+
+        if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+            # Preprocess the uncontrollable durations in the tpnu
+            # by setting the upper bounds of them to a very large number
+
+            for key in self.tpnu.temporal_constraints:
+                constraint = self.tpnu.temporal_constraints[key]
+                if not constraint.controllable:
+                    constraint.upper_bound = 100000
+
 
     def initialize(self):
         # clear the search state
@@ -102,7 +112,7 @@ class SearchProblem(object):
                     new_conflict = self.consistent(candidate)
 
                     if new_conflict is not None:
-
+                        # new_conflict.pretty_print()
                         # if (len(new_conflict.negative_cycles) > 1):
                         #     break
                         # if inconsistent, extract and record a conflict,
@@ -217,145 +227,330 @@ class SearchProblem(object):
             # the constraints are all previous negative cycles
             # plus this new one
 
-            all_cycles = candidate.continuously_resolved_cycles.copy()
-            all_cycles.add(negative_cycle)
+            if self.objective_type == ObjectiveType.MIN_COST:
+                self.generate_mincost_relaxations(candidate,conflict,negative_cycle)
+            elif self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                self.generate_maxflex_relaxations(candidate,conflict,negative_cycle)
+            else:
+                raise Exception("Unknown objective type: " + str(self.objective_type))
 
-            # Solve using PuLP, TODO, incorporate interface to other solvers,
-            # especially for nonlinear objective functions
-            prob = LpProblem("ContinuousConflictResolution", LpMinimize)
 
-            # Solve using PyOpt/Snopt,
-            # especially for nonlinear objective functions
+    def generate_mincost_relaxations(self,candidate,conflict,negative_cycle):
 
-            # construct variables and constraints
-            lp_variables = {}
-            lp_objective = []
+        all_cycles = candidate.continuously_resolved_cycles.copy()
+        all_cycles.add(negative_cycle)
 
-            # status indicating the feasibility of the relaxation problem
-            # 1 is feasible
-            # 0 is infeasible
-            # Note that this variable is shared by PuLP for its result
-            status = 1;
+        # Solve using PuLP, TODO, incorporate interface to other solvers,
+        # especially for nonlinear objective functions
+        prob = LpProblem("MinCostConflictResolution", LpMinimize)
 
-            for cycle in all_cycles:
+        # Solve using PyOpt/Snopt,
+        # especially for nonlinear constraints/objective functions
 
-                lp_constraint = []
+        # construct variables and constraints
+        lp_variables = {}
+        lp_objective = []
 
-                for constraint, bound in cycle.constraints.keys():
-                    # The constraint is a pair (temporal_constraint,0/1)
-                    # where 0 or 1 represent if it is the lower or upper bound
+        # status indicating the feasibility of the relaxation problem
+        # 1 is feasible
+        # 0 is infeasible
+        # Note that this variable is shared by PuLP for its result
+        status = 1;
 
-                    # first we define the variables
-                    # which only come from relaxable bounds of constraints
-                    # in other words, if no constraint in a negative cycle is
-                    # relaxable, the LP is infeasible
-                    # and we can stop here
+        for cycle in all_cycles:
 
-                    # TODO: add handler for uncontrollable duration
-                    variable = None
-                    if (constraint, bound) in lp_variables:
-                        variable = lp_variables[(constraint, bound)]
+            lp_ncycle_constraint = []
 
-                    coefficient = cycle.constraints[(constraint, bound)]
+            for constraint, bound in cycle.constraints.keys():
+                # The constraint is a pair (temporal_constraint,0/1)
+                # where 0 or 1 represent if it is the lower or upper bound
 
-                    if variable is None:
-                        if bound == 0:
-                            # lower bound, the domain is less than the original LB
-                            # if the constraint is not relaxable, fix its domain
-                            if constraint.relaxable_lb:
-                                variable = LpVariable(constraint.id + "-0",None,constraint.lower_bound)
-                            else:
-                                variable = constraint.lower_bound
+                # first we define the variables
+                # which only come from relaxable bounds of constraints
+                # in other words, if no constraint in a negative cycle is
+                # relaxable, the LP is infeasible
+                # and we can stop here
 
-                            # add the variable to the objective function
-                            if constraint.relaxable_lb:
+                # TODO: add handler for uncontrollable duration
+                variable = None
+                if (constraint, bound) in lp_variables:
+                    variable = lp_variables[(constraint, bound)]
+
+                coefficient = cycle.constraints[(constraint, bound)]
+
+                if variable is None:
+                    if bound == 0:
+                        # lower bound, the domain is less than the original LB
+                        # if the constraint is not relaxable, fix its domain
+                        if constraint.relaxable_lb:
+                            if constraint.controllable:
+                                variable = LpVariable(constraint.id + "-LB",None,constraint.lower_bound)
+                                # print("New LB VAR: " + str(variable) + " [" + str(None) + "," + str(constraint.lower_bound) + "]")
+                                # add the variable to the objective function
                                 lp_variables[(constraint,bound)] = variable
                                 lp_objective.append((constraint.lower_bound - variable) * constraint.relax_cost_lb)
-
-                        elif bound == 1:
-                            # upper bound, the domain is larger than the original UB
-                            # if the constraint is not relaxable, fix its domain
-                            if constraint.relaxable_ub:
-                                variable = LpVariable(constraint.id + "-1",constraint.upper_bound, None)
                             else:
-                                variable = constraint.upper_bound
-
-                            # add the variable to the objective function
-                            if constraint.relaxable_ub:
+                                variable = LpVariable(constraint.id + "-LB",constraint.lower_bound, constraint.upper_bound)
+                                # print("New LB-UC VAR: " + str(variable) + " [" + str(None) + "," + str(constraint.lower_bound) + "]")
+                                # add the variable to the objective function
                                 lp_variables[(constraint,bound)] = variable
-                                lp_objective.append((variable - constraint.upper_bound) * constraint.relax_cost_ub)
+                                lp_objective.append((variable - constraint.lower_bound) * constraint.relax_cost_lb)
 
-                        assert variable is not None
-
-                    lp_constraint.append(variable*coefficient)
-
-                # add the constraint to the problem
-                # print(str(lp_constraint))
-                if sum(lp_constraint) >= 0:
-                    # print(str(sum(lp_constraint)) + " >= 0")
-                    prob += sum(lp_constraint) >= 0
-                else:
-                    status = 0;
-                    # this is not resolvable
-                    # no need to proceed
-
-            if status > 0:
-                # Set the objective function
-                prob += sum(lp_objective)
-                # for c in prob.constraints:
-                #     print("CON: ", prob.constraints[c])
-                # print("OBJ: ", prob.objective)
-
-                # Solve the problem
-                try:
-                    import gurobipy
-                    status = prob.solve(solvers.GUROBI(mip=False,msg=False))
-                except ImportError:
-                    pass # Gurobi doesn't exist, use default Pulp solver.
-                    status = prob.solve()
-
-                # exit(0);
-
-
-            # if no solution was found, do nothing
-
-            if status > 0:
-
-                # A solution has been bound
-                # extract the result and store them into a set of relaxation
-                # the outcome is a set of relaxations
-                relaxations = []
-
-                for constraint, bound in lp_variables.keys():
-                    variable = lp_variables[(constraint, bound)]
-                    relaxed_bound = value(variable)
-
-                    if bound == 0:
-                        # check if this constraint bound is relaxed
-                        if relaxed_bound < constraint.lower_bound:
-                            # yes! create a new relaxation for it
-                            relaxation = TemporalRelaxation(constraint)
-                            relaxation.relaxed_lb = relaxed_bound
-                            # relaxation.pretty_print()
-                            relaxations.append(relaxation)
+                                # Add an additional constraint to make sure that
+                                # the lower bound is smaller than the upper bound
+                                if (constraint,1) in lp_variables:
+                                    ub_variable = lp_variables[(constraint,1)]
+                                    uncertain_duration_constraint = []
+                                    uncertain_duration_constraint.append((ub_variable - variable))
+                                    prob += sum(uncertain_duration_constraint) >= 0
+                        else:
+                            variable = constraint.lower_bound
 
                     elif bound == 1:
-                        # same for upper bound
-                        if relaxed_bound > constraint.upper_bound:
-                            # yes! create a new relaxation for it
-                            relaxation = TemporalRelaxation(constraint)
-                            relaxation.relaxed_ub = relaxed_bound
-                            # relaxation.pretty_print()
-                            relaxations.append(relaxation)
+                        # upper bound, the domain is larger than the original UB
+                        # if the constraint is not relaxable, fix its domain
+                        if constraint.relaxable_ub:
+                            if constraint.controllable:
+                                variable = LpVariable(constraint.id + "-UB",constraint.upper_bound, None)
+                                # print("New UB VAR: " + str(variable) + " [" + str(constraint.upper_bound) + "," + str(None) + "]")
+                                # add the variable to the objective function
+                                lp_variables[(constraint,bound)] = variable
+                                lp_objective.append((variable - constraint.upper_bound) * constraint.relax_cost_ub)
+                            else:
+                                variable = LpVariable(constraint.id + "-UB",constraint.lower_bound, constraint.upper_bound)
+                                # print("New UB-UC VAR: " + str(variable) + " [" + str(constraint.upper_bound) + "," + str(None) + "]")
+                                lp_variables[(constraint,bound)] = variable
+                                lp_objective.append((constraint.upper_bound - variable) * constraint.relax_cost_ub)
 
-                if len(relaxations) > 0:
-                    # we construct new candidates using this relaxations
-                    new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
+                                # Add an additional constraint to make sure that
+                                # the lower bound is smaller than the upper bound
+                                if (constraint,0) in lp_variables:
+                                    lb_variable = lp_variables[(constraint,0)]
+                                    uncertain_duration_constraint = []
+                                    uncertain_duration_constraint.append((variable - lb_variable))
+                                    prob += sum(uncertain_duration_constraint) >= 0
+                        else:
+                            variable = constraint.upper_bound
 
-                    if new_candidate is not None:
-                        new_candidate.resolved_conflicts.add(conflict)
-                        new_candidate.continuously_resolved_cycles.add(negative_cycle)
-                        self.add_candidate_to_queue(new_candidate)
+
+                    assert variable is not None
+
+                lp_ncycle_constraint.append(variable*coefficient)
+
+            # add the constraint to the problem
+            # print(str(lp_constraint))
+            if sum(lp_ncycle_constraint) >= 0:
+                # print(str(sum(lp_ncycle_constraint)) + " >= 0")
+                prob += sum(lp_ncycle_constraint) >= 0
+            else:
+                status = 0;
+                # this is not resolvable
+                # no need to proceed
+
+        if status > 0:
+            # Set the objective function
+            prob += sum(lp_objective)
+            # for c in prob.constraints:
+            #     print("CON: ", prob.constraints[c])
+            # print("OBJ: ", prob.objective)
+
+            # Solve the problem
+            try:
+                import gurobipy
+                status = prob.solve(solvers.GUROBI(mip=False,msg=False))
+            except ImportError:
+                pass # Gurobi doesn't exist, use default Pulp solver.
+                status = prob.solve()
+
+            # exit(0);
+
+        # print("Computing relaxation")
+        # if no solution was found, do nothing
+
+        if status > 0:
+
+            # A solution has been bound
+            # extract the result and store them into a set of relaxation
+            # the outcome is a set of relaxations
+            relaxations = []
+            # print("Found relaxation")
+            for constraint, bound in lp_variables.keys():
+                variable = lp_variables[(constraint, bound)]
+                relaxed_bound = value(variable)
+
+                if bound == 0:
+                    # check if this constraint bound is relaxed
+                    if relaxed_bound != constraint.lower_bound:
+                        # yes! create a new relaxation for it
+                        relaxation = TemporalRelaxation(constraint)
+                        relaxation.relaxed_lb = relaxed_bound
+                        # relaxation.pretty_print()
+                        relaxations.append(relaxation)
+
+                elif bound == 1:
+                    # same for upper bound
+                    if relaxed_bound != constraint.upper_bound:
+                        # yes! create a new relaxation for it
+                        relaxation = TemporalRelaxation(constraint)
+                        relaxation.relaxed_ub = relaxed_bound
+                        # relaxation.pretty_print()
+                        relaxations.append(relaxation)
+
+            if len(relaxations) > 0:
+                # we construct new candidates using this relaxations
+                new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
+
+                if new_candidate is not None:
+                    new_candidate.resolved_conflicts.add(conflict)
+                    new_candidate.continuously_resolved_cycles.add(negative_cycle)
+                    self.add_candidate_to_queue(new_candidate)
+
+
+    def generate_maxflex_relaxations(self,candidate,conflict,negative_cycle):
+
+        all_cycles = candidate.continuously_resolved_cycles.copy()
+        all_cycles.add(negative_cycle)
+
+        # Solve using PuLP, TODO, incorporate interface to other solvers,
+        # especially for nonlinear objective functions
+        prob = LpProblem("MaxFlexConflictResolution", LpMaximize)
+
+        # Solve using PyOpt/Snopt,
+        # especially for nonlinear constraints/objective functions
+
+        # construct variables and constraints
+        lp_variables = {}
+        lp_objective = []
+
+        max_flex_variable = LpVariable("Max Flex",0, None)
+        lp_objective.append(max_flex_variable)
+
+        # status indicating the feasibility of the relaxation problem
+        # 1 is feasible
+        # 0 is infeasible
+        # Note that this variable is shared by PuLP for its result
+        status = 1;
+
+        # We only consider the relaxation of the upper bound of
+        # uncontrollable duration.
+        # which means that we basically ignore the definition of
+        # 'relaxable bounds' in the network, and only consider the upper bounds
+        # of uncertain durations.
+
+        for cycle in all_cycles:
+
+            lp_constraint = []
+
+            for constraint, bound in cycle.constraints.keys():
+                # The constraint is a pair (temporal_constraint,0/1)
+                # where 0 or 1 represent if it is the lower or upper bound
+
+                # first we define the variables
+                # which only come from relaxable bounds of constraints
+                # in other words, if no constraint in a negative cycle is
+                # relaxable, the LP is infeasible
+                # and we can stop here
+
+                # TODO: add handler for uncontrollable duration
+                variable = None
+                if (constraint, bound) in lp_variables:
+                    variable = lp_variables[(constraint, bound)]
+
+                coefficient = cycle.constraints[(constraint, bound)]
+
+                if variable is None:
+                    if bound == 0:
+                        variable = constraint.lower_bound
+
+                    elif bound == 1:
+                        # upper bound, the domain is larger than the original UB
+                        # if the constraint is not relaxable, fix its domain
+                        if not constraint.controllable:
+                            variable = LpVariable(constraint.id + "-UB",constraint.lower_bound, constraint.upper_bound)
+                            lp_variables[(constraint,bound)] = variable
+                            # add the variable to the objective function
+
+                            max_flex_constraint = []
+                            max_flex_constraint.append((variable-constraint.lower_bound))
+                            max_flex_constraint.append(-1.0*max_flex_variable)
+                            prob += sum(max_flex_constraint) >= 0
+                        else:
+                            variable = constraint.upper_bound
+
+                    assert variable is not None
+
+                lp_constraint.append(variable*coefficient)
+
+            # add the constraint to the problem
+            # print(str(lp_constraint))
+            if sum(lp_constraint) >= 0:
+                # print(str(sum(lp_constraint)) + " >= 0")
+                prob += sum(lp_constraint) >= 0
+            else:
+                status = 0;
+                # this is not resolvable
+                # no need to proceed
+
+        if status > 0:
+            # Set the objective function
+            prob += sum(lp_objective)
+            # for c in prob.constraints:
+            #     print("CON: ", prob.constraints[c])
+            # print("OBJ: ", prob.objective)
+
+            # Solve the problem
+            try:
+                import gurobipy
+                status = prob.solve(solvers.GUROBI(mip=False,msg=False))
+            except ImportError:
+                pass # Gurobi doesn't exist, use default Pulp solver.
+                status = prob.solve()
+
+            # exit(0);
+
+
+        # if no solution was found, do nothing
+
+        if status > 0:
+            # A solution has been bound
+            # extract the result and store them into a set of relaxation
+            # the outcome is a set of relaxations
+            relaxations = []
+            max_flex_value = value(max_flex_variable)
+
+            for constraint, bound in lp_variables.keys():
+                variable = lp_variables[(constraint, bound)]
+                relaxed_bound = value(variable)
+
+                if bound == 0:
+                    # check if this constraint bound is relaxed
+                    if relaxed_bound != constraint.lower_bound:
+                        # yes! create a new relaxation for it
+                        relaxation = TemporalRelaxation(constraint)
+                        relaxation.relaxed_lb = relaxed_bound
+                        # relaxation.pretty_print()
+                        relaxations.append(relaxation)
+
+                elif bound == 1:
+                    # same for upper bound
+                    if relaxed_bound != constraint.upper_bound:
+                        # yes! create a new relaxation for it
+                        relaxation = TemporalRelaxation(constraint)
+                        relaxation.relaxed_ub = relaxed_bound
+                        # relaxation.pretty_print()
+                        relaxations.append(relaxation)
+
+            if len(relaxations) > 0:
+                # we construct new candidates using this relaxations
+                new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
+                if new_candidate is not None:
+                    new_candidate.resolved_conflicts.add(conflict)
+                    new_candidate.continuously_resolved_cycles.add(negative_cycle)
+
+                    # Override the utility to reflex the max-flexibility enabled by this candidate
+                    new_candidate.utility = max_flex_value
+                    self.add_candidate_to_queue(new_candidate)
+
 
     def check_complete(self,candidate):
 
@@ -458,8 +653,10 @@ class SearchProblem(object):
             conflict = TemporalConsistency.check(self.tpnu)
         elif self.feasibility_type == FeasibilityType.STRONG_CONTROLLABILITY:
             conflict = StrongControllability.check(self.tpnu)
-        elif self.feasibility_type == FeasibilityType.STRONG_CONTROLLABILITY:
+        elif self.feasibility_type == FeasibilityType.DYNAMIC_CONTROLLABILITY:
             conflict = DynamicControllability.check(self.tpnu)
+        else:
+            raise Exception("Unknown feasibility type: " + str(self.feasibility_type))
 
         # the conflict is a collection of dictionaries
         # each represents a negative cycle

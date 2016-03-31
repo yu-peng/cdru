@@ -46,83 +46,83 @@ class SearchTests(unittest.TestCase):
             is_feasible = solution is not None
             self.assertEqual(is_feasible, expected_result)
 
-    def test_cdru1(self):
+    # used in most of the tests.
+    def assert_max_flex_result(self, example_file, expected_result):
+        for solver in DynamicControllability.SOLVERS:
+
+            path = join(self.examples_dir, example_file)
+
+            if Tpnu.isCCTP(path):
+                tpnu = Tpnu.parseCCTP(path)
+            elif Tpnu.isTPN(path):
+                obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+                tpnu = Tpnu.from_tpn_autogen(obj)
+            else:
+                raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
+            search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MAX_FLEX_UNCERTAINTY)
+            search_problem.initialize()
+
+            solution = search_problem.next_solution()
+
+            print("----------------------------------------")
+            if solution is not None:
+                print(example_file)
+                solution.pretty_print()
+            else:
+                print(example_file)
+                print(None)
+                search_problem.pretty_print()
+            is_feasible = solution is not None
+            self.assertEqual(is_feasible, expected_result)
+
+    def test_cdru_basic(self):
         self.assert_cdru_result('test1.tpn', True)
-
-    def test_cdru2(self):
         self.assert_cdru_result('test2.tpn', True)
-
-    def test_cdru3(self):
         self.assert_cdru_result('test3.tpn', True)
-
-    def test_cdru4(self):
         self.assert_cdru_result('test4.tpn', True)
 
-    def test_bus_whoi1(self):
+    def test_whoi(self):
         self.assert_cdru_result('whoi-1.cctp', True)
-
-    def test_bus_whoi2(self):
         self.assert_cdru_result('whoi-2.cctp', True)
 
-    def test_bus_schedule1(self):
+    def test_bus_schedule(self):
         self.assert_cdru_result('Route1_2_1.cctp', True)
-
-    def test_bus_schedule2(self):
         self.assert_cdru_result('Route1_2_2.cctp', True)
 
-    def test_bus_selection1(self):
+    def test_bus_selection(self):
         self.assert_cdru_result('bus-1.cctp', True)
+        self.assert_cdru_result('bus-2.cctp', True)
+        self.assert_cdru_result('bus-3.cctp', False)
+        self.assert_cdru_result('bus-4.cctp', True)
 
-    def test_bus_selection2(self):
-        self.assert_cdru_result('bus-1.cctp', True)
-
-    def test_bus_selection3(self):
-        self.assert_cdru_result('bus-1.cctp', True)
-
-    def test_bus_selection4(self):
-        self.assert_cdru_result('bus-1.cctp', True)
-
-    def test_cctp_zipcar1(self):
+    def test_cctp_zipcar(self):
         self.assert_cdru_result('Zipcar-1.cctp', True)
-
-    def test_cctp_zipcar2(self):
         self.assert_cdru_result('Zipcar-2.cctp', True)
-
-    def test_cctp_zipcar3(self):
         self.assert_cdru_result('Zipcar-3.cctp', True)
-
-    def test_cctp_zipcar4(self):
         self.assert_cdru_result('Zipcar-4.cctp', True)
 
-    def test_tpn_zipcar1(self):
+    def test_tpn_zipcar(self):
         self.assert_cdru_result('Zipcar-1.tpn', True)
-
-    def test_tpn_zipcar2(self):
         self.assert_cdru_result('Zipcar-2.tpn', True)
-
-    def test_tpn_zipcar3(self):
         self.assert_cdru_result('Zipcar-3.tpn', True)
-
-    def test_tpn_zipcar4(self):
         self.assert_cdru_result('Zipcar-4.tpn', True)
-
-    def test_tpn_zipcar5(self):
         self.assert_cdru_result('Zipcar-5.tpn', True)
-
-    def test_tpn_zipcar6(self):
         self.assert_cdru_result('Zipcar-6.tpn', True)
-
-    def test_tpn_zipcar7(self):
         self.assert_cdru_result('Zipcar-7.tpn', True)
-
-    def test_tpn_zipcar8(self):
         self.assert_cdru_result('Zipcar-8.tpn', True)
-
-    def test_tpn_zipcar9(self):
         self.assert_cdru_result('Zipcar-9.tpn', True)
-
-    def test_tpn_zipcar10(self):
         self.assert_cdru_result('Zipcar-10.tpn', True)
+
+    def test_max_flex_rcpsp(self):
+        self.assert_max_flex_result('PSP1.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP1.SCH2.cctp', True)
+        self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+        self.assert_max_flex_result('PSP10.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH2.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH3.cctp', True)
+
 
     def test_tpn_zipcar11(self):
 
@@ -179,7 +179,7 @@ class SearchTests(unittest.TestCase):
         tpnu.node_number_to_id = node_number_to_id
 
         # next formulate a search problem using this tpnu
-        search_problem = SearchProblem(tpnu)
+        search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
         search_problem.initialize()
 
         solution = search_problem.next_solution()
