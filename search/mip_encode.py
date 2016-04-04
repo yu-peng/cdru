@@ -26,6 +26,7 @@ class MipEncode(object):
         self.u = {}  # upper bounds
         self.w = {}  # wait
         self.b = {}  # binary variables
+        self.x = {}  # binary variables
         self.calc_distance()
         
     def calc_distance(self):
@@ -68,7 +69,7 @@ class MipEncode(object):
     def add_vars(self, m):
         
         # add the extra variable to represent minimum delay
-        self.Z = m.addVar(vtype=GRB.CONTINUOUS, lb=0, name = "Z")
+        self.Z = m.addVar(vtype=GRB.CONTINUOUS, lb=.1, name = "Z")
         
         # add variables for links
         self.encoded_node_pairs = {}
@@ -121,7 +122,7 @@ class MipEncode(object):
 #                         add_controllable(new_node,e.to,0,0,None)
                 else:
                     K += 1
-                    print(e.fro, e.to, e.name, e.get_lower_bound(), e.get_upper_bound())
+                    #print(e.fro, e.to, e.name, e.get_lower_bound(), e.get_upper_bound())
                     if e.relaxable_lb == True:
                         self.l[(e.fro, e.to)] = m.addVar(lb=e.get_lower_bound(), ub=e.get_upper_bound(), vtype=GRB.CONTINUOUS, name=e.name + "l")
                     else:
@@ -175,6 +176,7 @@ class MipEncode(object):
                         # find necessary nodes to add links and mark the nodes by v_set
                         self.v_set = {}
                         self.wait_reduce(e)
+                       # print(self.v_set[e.fro],self.v_set[e.to])
                         
                         # add variables and constraints for the added links
                         for node_id in range(1, self.num_nodes):
@@ -208,8 +210,12 @@ class MipEncode(object):
 #                                         self.u[(e.to, node_id)] = -self.l[(node_id, e.to)]
 #                                         self.encoded_node_pairs[(e.to, node_id)] = True   
                                     if (e.fro, node_id) not in wait_pair:
+                                        # add wait variable
                                         self.w[(e.fro, node_id)] = m.addVar(lb = self.dis[(e.fro, node_id)][0], vtype=GRB.CONTINUOUS, name="w_%s_%s" % (e.fro, node_id))
+                                        # add binary variable wab - lac >= 0
                                         self.b[(e.fro, node_id)] = m.addVar(vtype=GRB.BINARY, name="b_%s_%s" % (e.fro, node_id))
+                                        # add binary variable lbc >= 0
+                                        self.x[(node_id, e.to)] = m.addVar(vtype = GRB.BINARY, name = "x_%s_%s" % (node_id, e.to))
                                         wait_pair[(e.fro, node_id)] = True
                     
                     m.update()
@@ -226,20 +232,42 @@ class MipEncode(object):
                         # triangular wait
                         m.addConstr(self.w[(node_a, node_b)] >= self.u[(e.fro, e.to)] - self.u[(node_b, e.to)], "triw%s_%s" % (node_a, node_b))
                         
+                        # add regression waits
+                        for e1 in self.network.temporal_constraints.values():
+                            if e1.to == node_b and (node_a, e1.fro) in wait_pair:
+                                # if wab >= lac, wad >= wab - ldb
+                                m.addConstr(self.w[(node_a, e1.fro)] - self.w[(node_a, node_b)] + self.l[(e1.fro, e1.to)] - 
+                                            (1 - self.b[(node_a, node_b)]) * (-GRB.INFINITY) >= 0 , "rew%s_%s"%(node_a, e1.fro))
+                                break
+                            
+                        # add wait bounds
+                        # wab - lac + (x-1) * L>=0
+                        m.addConstr(self.w[(node_a, node_b)] - self.l[(e.fro, e.to)] + (self.b[(node_a, node_b)] - 1) * (-GRB.INFINITY) >= 1, "wb1_%s_%s"%(node_a, node_b))
+                        # wab - lac - x * U <=0
+                        m.addConstr(self.w[(node_a, node_b)] - self.l[(e.fro, e.to)] - self.b[(node_a, node_b)] * (GRB.INFINITY) <= 0, "wb2_%s_%s"%(node_a, node_b))
+                        # lab - lac + (x-1) * L >=0
+                        m.addConstr(self.l[(node_a, node_b)] - self.l[(e.fro, e.to)] + (self.b[(node_a, node_b)] - 1) * (-GRB.INFINITY) >= 0, "wb3_%s_%s"%(node_a, node_b))
+                        # lab - wab - x * L >= 0
+                        m.addConstr(self.l[(node_a, node_b)] - self.w[(node_a, node_b)] - self.b[(node_a, node_b)] * (-GRB.INFINITY) >= 0, "wb4_%s_%s"%(node_a, node_b))
+                  
                         # precede constraints
-                        if self.dis[(node_a, node_b)][0] > 0 and self.dis[(node_a, node_b)][1] > 0:
+                        A = e.fro
+                        C = e.to
+                        B = node_b
+                       # print(A, B, C)
+                        if self.dis[(B, C)][0] > 0 and self.dis[(B, C)][1] > 0:
                         # if True:
                             # lab = uac - ubc
-                            m.addConstr(self.l[(node_a, node_b)] >= self.u[(e.fro, e.to)] - self.u[(node_b, e.to)], "pl%s_%s" % (node_a, node_b))
+                            m.addConstr(self.l[(A, B)] == self.u[(A, C)] - self.u[(B, C)], "pl%s_%s" % (A, B))
                             # uab = lac - lbc
-                            m.addConstr(self.u[(node_a, node_b)] <= self.l[(e.fro, e.to)] - self.l[(node_b, e.to)], "pu%s_%s" % (node_a, node_b))
-                        elif self.dis[(node_a, node_b)][1] > 0:
-                            m.addConstr(self.b[(node_a, node_b)] * (self.l[(node_a, node_b)] - self.u[(e.fro, e.to)] + self.u[(node_b, e.to)]) >= 0, "pbl%s_%s" % (node_a, node_b))
-                            m.addConstr(self.b[(node_a, node_b)] * (self.u[(node_a, node_b)] - self.l[(e.fro, e.to)] + self.l[(node_b, e.to)]) <= 0, "pbu%s_%s" % (node_a, node_b))
-                            # lab - xU <= 0
-                            m.addConstr(self.l[(node_b, e.to)] - self.b[(node_a, node_b)] * self.dis[(node_b, e.to)][1] <= -1e-4, "pbxu%s_%s" % (node_a, node_b))
-                            # lab - (1-x)(L-1) > 0
-                            m.addConstr(self.l[(node_b, e.to)] - (1 - self.b[(node_a, node_b)]) * (self.dis[(node_b, e.to)][0] - 1) >= 0, "pbxl%s_%s" % (node_a , node_b))
+                            m.addConstr(self.u[(A, B)] == self.l[(A, C)] - self.l[(B, C)], "pu%s_%s" % (A, B))
+                        elif self.dis[(B, C)][1] > 0:
+                            m.addConstr(self.x[(B, C)] * (self.l[(A, B)] - self.u[(e.fro, e.to)] + self.u[(B, e.to)]) >= 0, "pbl%s_%s" % (A, B))
+                            m.addConstr(self.x[(B, C)] * (self.u[(A, B)] - self.l[(e.fro, e.to)] + self.l[(B, e.to)]) <= 0, "pbu%s_%s" % (A, B))
+                            # lbc - xU <= 0
+                            m.addConstr(self.l[(B, C)] - self.x[(B, C)] * self.dis[(B, C)][1] <= 0, "pbxu%s_%s" % (A, B))
+                            # lbc + (x-1)(L-1) > 0
+                            m.addConstr(self.l[(B, C)] + (self.x[(B, C)] - 1) * (self.dis[(B, C)][0] - 1e-6) >= 1e-6, "pbxl%s_%s" % (A , B))
                                                 
                             
                             
@@ -293,7 +321,7 @@ class MipEncode(object):
                     if B != C:
                         # add shortest path constraints
                         if (B, C) not in self.encoded_node_pairs :
-                            print("add edge")
+                            #print("add edge")
                             self.add_var_rqm(m, B, C)
                             m.update()
                         
@@ -320,7 +348,7 @@ class MipEncode(object):
                     continue
 
                 if vname.find(e.name) != -1:
-                    print(vname, e.name)
+                    #print(vname, e.name)
                     new_relaxation = TemporalRelaxation(e)
                     if vname.find("l") != -1:
                         new_relaxation.relaxed_lb = var_a.getAttr("X")
