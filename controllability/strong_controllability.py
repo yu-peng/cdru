@@ -112,8 +112,10 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             lb_edge = DistanceGraphEdge(to, fro, -lb, EdgeType.SIMPLE, renaming=renaming)
 
             if edge_id is not None:
-                self.edge_support[ub_edge] = EdgeSupport.base({(EdgeSupport.UPPER, edge_id): 1,})
-                self.edge_support[lb_edge] = EdgeSupport.base({(EdgeSupport.LOWER, edge_id): -1,})
+                # Note that the sign for the upper and lower bound supports are reversed
+                # Since they are being subtracted during the reduction
+                self.edge_support[ub_edge] = EdgeSupport.base({(EdgeSupport.UPPER, edge_id): -1,})
+                self.edge_support[lb_edge] = EdgeSupport.base({(EdgeSupport.LOWER, edge_id): 1,})
             else:
                 self.edge_support[ub_edge] = EdgeSupport.base({})
                 self.edge_support[lb_edge] = EdgeSupport.base({})
@@ -241,7 +243,7 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
         return edges_on_cycle
 
 
-    def extract_conflict(self,edge_list, include_combined=True):
+    def extract_conflict(self,edge_list):
         conflicts = []
         expression_cache = {}
 
@@ -254,14 +256,13 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
             return result
 
         def get_edge_expression(edge):
+            # print(str(edge))
             if edge not in expression_cache:
-
                 if self.edge_support[edge].type == EdgeSupport.BASE:
+                    # print("Exp: " + str(self.edge_support[edge].expression))
                     expression_cache[edge] = self.edge_support[edge].expression
                 else:
-                    # Check if the current edge is a moat and provides a tighter bound
-                    new_neg_value = neg_value
-
+                    # print("Parent: " + str(len(self.edge_support[edge].parents)))
                     expression_cache[edge] = combine_expressions(
                         [get_edge_expression(parent) for parent in self.edge_support[edge].parents]
                     )
@@ -277,12 +278,8 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
         for edge in edge_list:
             neg_value += edge.value
 
-        if include_combined:
-            # print('NValue: ' + str(neg_value))
-            big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
-            conflicts.append(big_conflict)
-        else:
-            # print('Nedge: ' + str(neg_value))
-            combine_expressions([get_edge_expression(edge,) for edge in edge_list])
+        # print('NValue: ' + str(neg_value))
+        big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
+        conflicts.append(big_conflict)
 
         return conflicts

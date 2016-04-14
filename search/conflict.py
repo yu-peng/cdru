@@ -37,6 +37,7 @@ class Conflict(object):
         self.negative_cycles.add(negative_cycle)
 
     def add_negative_cycles(self,cycles,tpnu):
+        # print("Adding " + str(len(cycles)) + " cycles")
         for cycle in cycles:
             self.add_negative_cycle(cycle,tpnu)
 
@@ -74,6 +75,9 @@ class Conflict(object):
             expression_str.append(' = ' + str(curr_value))
 
             print(''.join(expression_str))
+
+            if (curr_value >= 0):
+                raise Exception("Positive conflict value detected: " + str(curr_value))
 
 class NegativeCycle(object):
 

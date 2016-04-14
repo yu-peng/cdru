@@ -23,7 +23,7 @@ class DistanceGraphEdge(object):
             type_str = 'UC(%s):' % maybe_letter
         elif self.edge_type == EdgeType.LOWER_CASE:
             type_str = 'LC(%s):' % maybe_letter
-        return '%s\t\t---%s%.1f---> \t\t%s' % (fro,
+        return '%s\t\t---[%s%.1f]---> \t\t%s' % (fro,
                                     type_str,
                                     self.value,
                                     to)

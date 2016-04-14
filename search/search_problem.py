@@ -334,14 +334,15 @@ class SearchProblem(object):
 
 
                     assert variable is not None
-
+                # print("Adding variable " + str(coefficient) + "*"+str(variable))
                 lp_ncycle_constraint.append(variable*coefficient)
 
             # add the constraint to the problem
-            # print(str(lp_constraint))
+            # print(str(lp_ncycle_constraint))
             if sum(lp_ncycle_constraint) >= 0:
                 # print(str(sum(lp_ncycle_constraint)) + " >= 0")
-                prob += sum(lp_ncycle_constraint) >= 0
+                # Over relax a bit to account for precision issues
+                prob += sum(lp_ncycle_constraint) >= 0.0001
             else:
                 status = 0;
                 # this is not resolvable
@@ -359,7 +360,7 @@ class SearchProblem(object):
                 import gurobipy
                 status = prob.solve(solvers.GUROBI(mip=False,msg=False))
             except ImportError:
-                pass # Gurobi doesn't exist, use default Pulp solver.
+                # pass # Gurobi doesn't exist, use default Pulp solver.
                 status = prob.solve()
 
             # exit(0);
@@ -369,7 +370,7 @@ class SearchProblem(object):
 
         if status > 0:
 
-            # A solution has been bound
+            # A solution has been found
             # extract the result and store them into a set of relaxation
             # the outcome is a set of relaxations
             relaxations = []
@@ -666,9 +667,8 @@ class SearchProblem(object):
             # reformat the conflict
             kirk_conflict = Conflict()
             kirk_conflict.add_negative_cycles(conflict,self.tpnu)
-            # kirk_conflict.pretty_print()
-
-            # kirk_conflict.pretty_print()
+            kirk_conflict.pretty_print()
+            # print("Conflict size: " + str(len(kirk_conflict.negative_cycles)))
             return kirk_conflict
 
     def implement(self,candidate):

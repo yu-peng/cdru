@@ -68,6 +68,7 @@ def spfa(source, num_nodes, weights, neighbor_list, epsilon=10E-5):
                 visited[node] = True
 
         assert negative_cycle is not None
+        # print("NCycle size: " + str(len(negative_cycle)))
         return distance, negative_cycle
     else:
         return distance, None

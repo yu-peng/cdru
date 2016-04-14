@@ -12,6 +12,7 @@ from temporal_network.decision_variable import DecisionVariable
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.assignment import Assignment
 from search.mip_encode import MipEncode
+from datetime import datetime
 
 class SearchTests(unittest.TestCase):
     def setUp(self):
@@ -32,15 +33,19 @@ class SearchTests(unittest.TestCase):
             else:
                 raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
 
+            startTime = datetime.now()
             search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
             search_problem.initialize()
 
             solution = search_problem.next_solution()
 
+            runtime = datetime.now() - startTime
+
             print("----------------------------------------")
             if solution is not None:
                 print(example_file)
-                solution.pretty_print()
+                # solution.pretty_print()
+                print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
             else:
                 print(example_file)
                 print(None)
@@ -146,26 +151,36 @@ class SearchTests(unittest.TestCase):
 #         self.assert_cdru_result('Zipcar-10.tpn', True)
 # 
     def test_max_flex_rcpsp(self):
-#         self.assert_max_flex_result('PSP1.SCH1.cctp', True)
-          #self.assert_max_flex_result('PSP1.SCH2.cctp', True)
-          testlist = "/home/jing/workspace/testcase/list.txt"
-          f = open(testlist)
-          s = f.readline() 
-          self.ofile = open('output.txt','w')
-          self.ofile.close()
+        # self.assert_max_flex_result('PSP1.SCH1.cctp', True)
+        #self.assert_max_flex_result('PSP1.SCH2.cctp', True)
+        testlist = "/home/jing/workspace/testcase/list.txt"
+        f = open(testlist)
+        s = f.readline()
+        self.ofile = open('output.txt','w')
+        self.ofile.close()
 
-          while len(s) > 1:
-              s = s.replace('\n','')
-              self.assert_max_flex_result(s, True)
-              s = f.readline() 
-          self.ofile.close()         
-#          self.assert_max_flex_result('PSP1.SCH3.cctp', True)
-#          self.assert_max_flex_result('PSP10.SCH1.cctp', True)
-#          self.assert_max_flex_result('PSP100.SCH1.cctp', True)
-#          self.assert_max_flex_result('PSP100.SCH2.cctp', True)
-#          self.assert_max_flex_result('PSP100.SCH3.cctp', True)
-# #  
- 
+        while len(s) > 1:
+            s = s.replace('\n','')
+            self.assert_max_flex_result(s, True)
+            s = f.readline()
+        self.ofile.close()
+        #          self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+        #          self.assert_max_flex_result('PSP10.SCH1.cctp', True)
+        #          self.assert_max_flex_result('PSP100.SCH1.cctp', True)
+        #          self.assert_max_flex_result('PSP100.SCH2.cctp', True)
+        #          self.assert_max_flex_result('PSP100.SCH3.cctp', True)
+
+        self.assert_max_flex_result('PSP1.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP1.SCH2.cctp', True)
+        self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+        self.assert_max_flex_result('PSP10.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH1.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH2.cctp', True)
+        self.assert_max_flex_result('PSP100.SCH3.cctp', True)
+
+    def test_redline_schedule(self):
+        self.assert_cdru_result('Route_Red_1_testwithstop_3.cctp', True)
+
     def test_tpn_zipcar11(self):
  
         # build a kirk problem

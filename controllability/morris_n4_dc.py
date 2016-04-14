@@ -232,7 +232,7 @@ class MorrisN4Dc(object):
         return new_edge
 
 
-    def reduce_lower_case(self, num_nodes, edge_list, potentials, lc_edge, epsilon=10E-8):
+    def reduce_lower_case(self, num_nodes, edge_list, potentials, lc_edge, epsilon=10E-5):
         new_edges = set()
 
         # Notice that here we are going to be using Johnson's algorithm in
@@ -362,6 +362,7 @@ class MorrisN4Dc(object):
             # print('Nedge: ' + str(neg_value))
             combine_expressions([get_edge_expression(edge) for edge in edge_list])
 
+        # print("Extracted " + str(len(conflicts)) + " cycles")
         return conflicts
 
     def expressions_pretty_print(self, expressions):
@@ -431,6 +432,7 @@ class MorrisN4Dc(object):
 
                 conflict =  self.extract_conflict(negative_cycle)
                 # self.expressions_pretty_print(conflict)
+                # print("Conflict detected during allmax checking")
                 potential_conflict = conflict
                 break
 
@@ -444,6 +446,7 @@ class MorrisN4Dc(object):
 
                     if type(reduced_edges) is DistanceGraphEdge:
                         potential_conflict = self.extract_conflict([reduced_edges],include_combined=False)
+                        # print("Conflict detected during reduction")
                         return potential_conflict
 
                     new_edges.extend(reduced_edges)
