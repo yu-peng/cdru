@@ -11,7 +11,7 @@ from search.search_problem import SearchProblem, FeasibilityType, ObjectiveType
 from temporal_network.decision_variable import DecisionVariable
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.assignment import Assignment
-from search.mip_encode import MipEncode
+#from search.mip_encode import MipEncode
 from datetime import datetime
 
 class SearchTests(unittest.TestCase):
@@ -179,7 +179,7 @@ class SearchTests(unittest.TestCase):
         self.assert_max_flex_result('PSP100.SCH3.cctp', True)
 
     def test_redline_schedule(self):
-        self.assert_cdru_result('Route_Red_1_testwithstop_3.cctp', True)
+        self.assert_cdru_result('Route_Red_Headway_2.cctp', True)
 
     def test_tpn_zipcar11(self):
  
