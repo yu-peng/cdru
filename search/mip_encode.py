@@ -5,13 +5,39 @@ from friends.utils.logging import initialize
 from search.candidate import Candidate
 from search.temporal_relaxation import TemporalRelaxation
 from temporal_network.temporal_constraint import TemporalConstraint
+from search.search_problem import ObjectiveType
 
 class MipEncode(object):
     
-    def __init__(self, tpnu):
+    def __init__(self, tpnu, obj_type):
         self.network = tpnu
+        self.objective_type = obj_type;
+        self.DEFALT = 100000
+        
+        # no two links share the same end nodes
+        pair_nodes = {}
+        v_new_constraint = {}
+        for e in self.network.temporal_constraints.values():
+            print(e.fro, e.to, e.get_lower_bound(), e.get_upper_bound(),e.controllable)
+            if e.controllable:
+                if e.get_upper_bound() > self.DEFALT:
+                    self.network.temporal_constraints[e.id].upper_bound = self.DEFALT/10
+                if (e.fro, e.to) in pair_nodes:
+                    #print("o", e.fro, e.to)
+                    new_node = self.network.num_nodes+1
+                    self.network.num_nodes+=1
+                    new_constraint = TemporalConstraint(new_node, new_node, e.fro, new_node, 0,0)
+                    self.network.temporal_constraints[e.id].fro = new_node
+                    v_new_constraint[new_constraint.id] = new_constraint
+                    #print("s",new_constraint.fro,new_constraint.to, e.fro, e.to)
+#                    self.network.add_temporal_constraint(new_constraint)
+                pair_nodes[(e.fro, e.to)] = True
+        
+        for e in v_new_constraint.values():
+            self.network.add_temporal_constraint(e)
         self.initialize()
-       # self.mip_solver()
+
+        # self.mip_solver()
         
     def initialize(self):
         if type(self.network) == ParseTpnClass:
@@ -27,18 +53,30 @@ class MipEncode(object):
         self.w = {}  # wait
         self.b = {}  # binary variables
         self.x = {}  # binary variables
+   
         self.calc_distance()
-        self.DEFALT = 100000
+        
+        if self.objective_type == ObjectiveType.MIN_COST:
+            self.rl = {}
+            self.ru = {}
+            self.tl = {}
+            self.tu = {}
+        
+
+
         
     def calc_distance(self):
         self.dis = {}
+        # for RCPSP Problem, the number of nodes are limited        
         for node_a in range(1, self.num_nodes + 1):
             for node_b in range(node_a + 1, self.num_nodes + 1):
-                self.dis[(node_a, node_b)] = self.dis[(node_b, node_a)] = (-10000, 10000)
+                if (node_a, node_b) not in self.dis:
+                    self.dis[(node_a, node_b)] = self.dis[(node_b, node_a)] = (-self.DEFALT/10, self.DEFALT/10)
+ 
         for e in self.network.temporal_constraints.values():
             if e.controllable:
-                tmp_lb = -10000
-                tmp_ub = 10000
+                tmp_lb = -self.DEFALT/20
+                tmp_ub = self.DEFALT/20
                 if tmp_lb < e.get_lower_bound():
                     tmp_lb = e.get_lower_bound()
                 if tmp_ub > e.get_upper_bound():
@@ -46,8 +84,10 @@ class MipEncode(object):
                 self.dis[(e.fro, e.to)] = (tmp_lb, tmp_ub)
                 self.dis[(e.to, e.fro)] = (-tmp_ub, -tmp_lb)
             else:
-                self.dis[(e.fro, e.to)] = (e.get_lower_bound(), 10000)
+                self.dis[(e.fro, e.to)] = (e.get_lower_bound(), self.DEFALT/10)
                 # self.dis[(e.to, e.fro)] = (-e.get_upper_bound(), -e.get_lower_bound())
+        
+      
         return  
         for node_k in range(1, self.num_nodes + 1):
             for node_i in range(1, self.num_nodes + 1):
@@ -130,7 +170,10 @@ class MipEncode(object):
     def add_vars(self, m):
         
         # add the extra variable to represent minimum delay
-        self.Z = m.addVar(vtype = GRB.CONTINUOUS, lb = 0, name = "Z")
+        if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+            self.Z = m.addVar(vtype = GRB.CONTINUOUS, lb = 0, name = "Z")
+        else:
+            self.objexp = 0;
         
         # add variables for links
         self.encoded_node_pairs = {}
@@ -144,30 +187,49 @@ class MipEncode(object):
             if e.activated:
                 if e.fro == 0 or e.to == 0:
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
-                
+                print('a', e.fro, e.to, e.controllable, e.relaxable_lb, e.relaxable_ub, e.get_lower_bound(), e.get_upper_bound())
                 if e.controllable:
                     
                     # Make sure no two edges share the same from and to nodes
                     if (e.fro, e.to) not in self.encoded_node_pairs:
                         # add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
-                        self.l[(e.fro, e.to)] = m.addVar(lb=self.dis[(e.fro, e.to)][0], ub=self.dis[(e.fro, e.to)][1], vtype=GRB.CONTINUOUS, name="l_%s_%s" % (e.fro - 1, e.to - 1))
-                        self.u[(e.fro, e.to)] = m.addVar(lb=self.dis[(e.fro, e.to)][0], ub=self.dis[(e.fro, e.to)][1], vtype=GRB.CONTINUOUS, name="u_%s_%s" % (e.fro - 1, e.to - 1))
+                        if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                            self.l[(e.fro, e.to)] = m.addVar(lb=self.dis[(e.fro, e.to)][0], ub=self.dis[(e.fro, e.to)][1], vtype=GRB.CONTINUOUS, name="l_%s_%s" % (e.fro - 1, e.to - 1))
+                            self.u[(e.fro, e.to)] = m.addVar(lb=self.dis[(e.fro, e.to)][0], ub=self.dis[(e.fro, e.to)][1], vtype=GRB.CONTINUOUS, name="u_%s_%s" % (e.fro - 1, e.to - 1))
+                    
+                        else:
+                            # the relaxable links are [L-l, U+u]
+                            #print("vtl", e.fro, e.to)
+                            self.tl[(e.fro, e.to)] = m.addVar(ub = self.DEFALT/10,vtype = GRB.CONTINUOUS, name = "vlt_%s_%s"%(e.fro - 1, e.to - 1))
+                            self.tu[(e.fro, e.to)] = m.addVar(ub = self.DEFALT/10,vtype = GRB.CONTINUOUS, name = "vut_%s_%s"%(e.fro - 1, e.to - 1))
+                            if e.relaxable_lb == True:
+                                #print(e.fro)
+                                #print(e.fro, e.to, "v")
+                                self.rl[(e.fro, e.to)] = m.addVar(ub = self.DEFALT/10,vtype = GRB.CONTINUOUS, name = "vlr_%s_%s"%(e.fro- 1, e.to - 1))
+                            if e.relaxable_ub == True:
+                                self.ru[(e.fro, e.to)] = m.addVar(ub =self.DEFALT/10,vtype = GRB.CONTINUOUS, name = "vur_%s_%s" % (e.fro - 1, e.to - 1))
                         self.encoded_node_pairs[(e.fro, e.to)] = True
                     else:
-                        sdf = 1
+                        print("error")
                 else:
                     K += 1
                     # print(e.fro, e.to, e.name, e.get_lower_bound(), e.get_upper_bound())
                     if e.relaxable_lb == True:
-                        self.l[(e.fro, e.to)] = m.addVar(lb=e.get_lower_bound(), ub=self.DEFALT, vtype=GRB.CONTINUOUS, name="cl_%s_%s" % (e.fro - 1, e.to - 1))  # name=e.name + "l")
+                        self.l[(e.fro, e.to)] = m.addVar(lb=e.get_lower_bound(), ub=e.get_upper_bound(), vtype=GRB.CONTINUOUS, name="cl_%s_%s" % (e.fro - 1, e.to - 1))  # name=e.name + "l")
                         self.relax_e["cl_%s_%s" % (e.fro - 1, e.to - 1)] = e
                     else:
                         self.l[(e.fro, e.to)] = e.get_lower_bound()
                     if e.relaxable_ub == True:
-                        self.u[(e.fro, e.to)] = m.addVar(lb=e.get_lower_bound(), ub=self.DEFALT, vtype=GRB.CONTINUOUS, name="cu_%s_%s" % (e.fro - 1, e.to - 1))  # name=e.name + "u")
+                        self.u[(e.fro, e.to)] = m.addVar(lb=e.get_lower_bound(), ub=e.get_upper_bound(), vtype=GRB.CONTINUOUS, name="cu_%s_%s" % (e.fro - 1, e.to - 1))  # name=e.name + "u")
                         self.relax_e["cu_%s_%s" % (e.fro - 1, e.to - 1)] = e
                     else:
-                        self.u[(e.fro, e.to)] = self.DEFALT                                                
+                        self.u[(e.fro, e.to)] = m.addVar(lb=e.get_upper_bound(), ub=e.get_upper_bound(), vtype=GRB.CONTINUOUS, name="cu_%s_%s" % (e.fro - 1, e.to - 1))  # name=e.name + "u")
+                        self.relax_e["cu_%s_%s" % (e.fro - 1, e.to - 1)] = e
+   
+                        #if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                         #   self.u[(e.fro, e.to)] = self.DEFALT
+                        #else :
+                          #  self.u[(e.fro, e.to)] = self.dis[(e.fro, e.to)][1]                                                
                     self.encoded_node_pairs[(e.fro, e.to)] = True
                     self.ctg_by_fro[e.fro] = e
     
@@ -245,6 +307,19 @@ class MipEncode(object):
                                         
                                 
     def add_constrs(self, m):  
+        if self.objective_type == ObjectiveType.MIN_COST:
+            for e in self.network.temporal_constraints.values():
+                if e.fro == 0 or e.to == 0:
+                    raise Exception("Node with 0")
+                if e.controllable and e.activated :
+                    #print(e.fro, e.to, e.get_lower_bound(),e.get_upper_bound())
+                    self.l[(e.fro, e.to)] = e.get_lower_bound() + self.tl[(e.fro, e.to)]
+                    self.u[(e.fro, e.to)] = e.get_upper_bound() - self.tu[(e.fro, e.to)]
+                    if e.relaxable_lb == True:
+                        #print(e.fro, e.to, e.name)
+                        self.l[(e.fro, e.to)] -= self.rl[(e.fro, e.to)]
+                    if e.relaxable_ub == True:
+                        self.u[(e.fro, e.to)] += self.ru[(e.fro, e.to)]
         
         added_pairs ={}
         for (node_a, node_b) in self.encoded_node_pairs:
@@ -255,14 +330,29 @@ class MipEncode(object):
             added_pairs[(node_b, node_a)] = True 
             
             # l <= u
-            m.addConstr(self.l[(node_a, node_b)] <= self.u[(node_a, node_b)], "Ub_%s_%s" % (node_a - 1, node_b - 1))
+            #print(node_a, node_b, self.l[(node_a, node_b)], self.u[(node_a, node_b)])
+            m.addConstr(self.l[(node_a, node_b)] -self.u[(node_a, node_b)] <= 0, "Ub_%s_%s" % (node_a - 1, node_b - 1))
+       
         for (node_a, node_b) in added_pairs:
             self.encoded_node_pairs[(node_a, node_b)] = True
         
         for e in self.network.temporal_constraints.values():
             if not e.controllable:
                 # add z <= u - l
-                m.addConstr(self.Z <= self.u[(e.fro, e.to)] - self.l[(e.fro, e.to)], "ZC%s" % (e.fro / 2))               
+                if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                    m.addConstr(self.Z <= self.u[(e.fro, e.to)] - self.l[(e.fro, e.to)], "ZC%s" % (e.fro / 2))
+                else:
+                    # relax a ctg means tightening the bounds
+                    if e.relaxable_lb:
+                        self.objexp += (self.l[(e.fro, e.to)] - self.dis[(e.fro, e.to)][0])*e.relax_cost_lb
+                    if e.relaxable_ub:
+                        self.objexp += -(self.u[(e.fro, e.to)] - self.dis[(e.fro, e.to)][1])*e.relax_cost_ub
+            else:
+                # relax a rqm means extending the bounds
+                if e.relaxable_lb:
+                    self.objexp += -(self.l[(e.fro, e.to)] - self.dis[(e.fro, e.to)][0])*e.relax_cost_lb
+                if e.relaxable_ub:
+                    self.objexp += (self.u[(e.fro, e.to)] - self.dis[(e.fro, e.to)][1])*e.relax_cost_ub
 
         for (node_a, node_b) in self.wait_pair:
             # l <= w <= u
@@ -429,8 +519,8 @@ class MipEncode(object):
         try:
             
             # create a new model
-            m = Model("mip_solver")
-            #m.params.outputflag = 1
+            m = Model("mip_encode")
+            m.params.outputflag = 1
             #m.params.feasibilitytol = 1e-9
             #m.params.intfeastol = 1e-9
             # add variables
@@ -440,13 +530,16 @@ class MipEncode(object):
             # integrate new variables
             m.update()
             # print("add constr")
-            m.setObjective(self.Z + 0.0, GRB.MAXIMIZE)
+
             # add constraints
             self.add_constrs(m)
             self.add_spc(m)
-      
+            if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                m.setObjective(self.Z + 0.0, GRB.MAXIMIZE)
+            else:
+                m.setObjective(self.objexp, GRB.MINIMIZE)
             m.update()
-            #m.write("1.lp")
+            m.write("1.lp")
             m.optimize()
             
             if m.status == GRB.Status.INF_OR_UNBD:
@@ -459,8 +552,8 @@ class MipEncode(object):
                 return self.get_solution(m)
             if m.status != GRB.Status.INFEASIBLE:
                 print(m.status)
-            #m.computeIIS()
-            #m.write("1.ilp")
+            m.computeIIS()
+            m.write("1.ilp")
             
         except GurobiError as e:
             print('Error reported')
