@@ -13,11 +13,14 @@ class MorrisN4Dc(object):
     def __init__(self):
         self.edge_support = {}
         self.moat_edges = set()
+        self.includeReductionCycle = False
+        self.start_node = 0;
 
     def generate_graph_from_tpnu(self, network):
         """Generates graph of edges from a tpnu"""
 
         num_nodes = network.num_nodes
+        self.start_node = network.start_node;
         edge_list = []
 
         if hasattr(network, 'node_number_to_id'):
@@ -43,11 +46,13 @@ class MorrisN4Dc(object):
 
             if not math.isinf(ub):
                 edge_list.append(ub_edge)
+                # print("UB edge: "+ str(ub_edge))
             # else:
             #     print("Ignoring +inf UB of " + e.id)
 
             if not math.isinf(lb):
                 edge_list.append(lb_edge)
+                # print("LB edge: "+ str(lb_edge))
             # else:
             #     print("Ignoring -inf LB of " + e.id)
 
@@ -71,6 +76,9 @@ class MorrisN4Dc(object):
 
                 edge_list.append(lb_ub_edge)
                 edge_list.append(lb_lb_edge)
+
+                # print("LBUB edge: "+ str(lb_ub_edge))
+                # print("LBLB edge: "+ str(lb_lb_edge))
             else:
                 new_node = fro
 
@@ -97,6 +105,10 @@ class MorrisN4Dc(object):
             edge_list.append(ub_cond_edge)
             edge_list.append(lb_cond_edge)
 
+            # print("UB edge: "+ str(ub_edge))
+            # print("LB edge: "+ str(lb_edge))
+            # print("UB cond edge: "+ str(ub_cond_edge))
+            # print("LB cond edge: "+ str(lb_cond_edge))
 
         K = 0
         encoded_node_pairs = {}
@@ -105,6 +117,7 @@ class MorrisN4Dc(object):
             if e.activated:
                 if e.fro == 0 or e.to == 0:
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
+
                 if e.controllable:
                     # Make sure no two edges share the same from and to nodes
                     if (e.fro,e.to) not in encoded_node_pairs:
@@ -127,7 +140,7 @@ class MorrisN4Dc(object):
                         new_node = num_nodes + 1
                         num_nodes += 1
                         renaming[new_node] = renaming[e.fro] + "'"
-                        add_uncontrollable(e.fro, new_node, e.to, e.get_lower_bound(), e.get_upper_bound(), e.id)
+                        add_uncontrollable(e.fro, new_node, e.to, e.get_lower_bound(),e.get_upper_bound(), e.id)
 
         return num_nodes, edge_list, K
 
@@ -151,9 +164,12 @@ class MorrisN4Dc(object):
                     weights[pair] = e.value
 
         # Like in Johnson's algorithm we add node 0 artificially
-        for node in range(1, num_nodes + 1):
-            weights[(0,node)] = 0
-            neighbor_list[0].add(node)
+        # for node in range(1, num_nodes + 1):
+        #     weights[(0,node)] = 0
+        #     neighbor_list[0].add(node)
+
+        weights[(0,self.start_node)] = 0
+        neighbor_list[0].add(self.start_node)
 
         distances, negative_cycle = spfa(source = 0,
                                      num_nodes=num_nodes + 1,
@@ -172,7 +188,7 @@ class MorrisN4Dc(object):
                 edges_on_cycle.append(edge)
                 nvalue += edge.value
                 # print(str(fro) + '->' + str(to) + ':' + str(edge.value))
-            # print('Cycle size: ' + str(len(edges_on_cycle)) + ' with value ' + str(nvalue))
+            print('Cycle size: ' + str(len(edges_on_cycle)) + ' with value ' + str(nvalue))
 
             if nvalue > 0:
                 raise Exception('Positive cycle value detected!');
@@ -195,6 +211,7 @@ class MorrisN4Dc(object):
         if edge1.edge_type == EdgeType.SIMPLE and edge2.edge_type == EdgeType.UPPER_CASE:
             new_maybe_letter = edge2.maybe_letter
             new_type = EdgeType.UPPER_CASE
+            # print("Upper Case " + str(edge1) + "+++" + str(edge2));
 
         # LOWER CASE REDUCTION
         elif (edge1.edge_type == EdgeType.LOWER_CASE and edge2.edge_type == EdgeType.SIMPLE and
@@ -260,7 +277,9 @@ class MorrisN4Dc(object):
         q = PriorityQueue()
         q.put((0, source))
 
-        #print 'processing LCE %s' % (lc_edge,)
+        # print('processing LCE %s' % (lc_edge,))
+
+        edge_nodes = {}
 
         while not q.empty():
             _, node = q.get()
@@ -276,24 +295,37 @@ class MorrisN4Dc(object):
                     # add calculate reduced edge that lead us here
                     if reduced_edge[node] is None:
                         new_reduced_edge = edge
+                        edge_nodes[new_reduced_edge] = [edge.fro,edge.to]
                     else:
                         new_reduced_edge = self.reduce_edge(reduced_edge[node], edge)
+                        edge_nodes[new_reduced_edge] = edge_nodes[reduced_edge[node]] + [edge.to]
+                        # print(str(reduced_edge[node].fro) + "-->" + str(reduced_edge[node].to) + "-->" + str(edge.to) + '/' +
+                        #       str(reduced_edge[node].value) + "+" + str(edge.value) + "=" + str(new_reduced_edge.value)+ str(edge_nodes[new_reduced_edge]))
+
                     if new_reduced_edge is None:
                         # cannot make a reduction
                         continue
-                    reduced_edge[neighbor] = new_reduced_edge
                     distance[neighbor] = distance[node] + edge_value_potential
-                    q.put((distance[neighbor], neighbor))
+                    real_reduced_distance = distance[neighbor] + potentials[neighbor] - potentials[source]
+
+                    if new_reduced_edge.value >= 0:
+                        reduced_edge[neighbor] = new_reduced_edge
+                        q.put((distance[neighbor], neighbor))
+
                     # This the reduced distance as described in the book, excluding the effect of
                     # potentials
-                    real_reduced_distance = distance[neighbor] + potentials[neighbor] - potentials[source]
+
                     # check if we have a moat
-                    if real_reduced_distance < 0 - epsilon:
-                        relevant_edge = self.reduce_edge(lc_edge, reduced_edge[neighbor])
+                    if real_reduced_distance < 0 - epsilon \
+                            and lc_edge.fro != new_reduced_edge.to\
+                            and edge.value < 0:
+                        # print("Edge value " + str(reduced_edge[node].value))
+                        relevant_edge = self.reduce_edge(lc_edge, new_reduced_edge)
 
                         if relevant_edge is not None:
                             #print '^^ moat ^^'
                             new_edges.add(relevant_edge)
+                            print("Negative edge detected " + str(new_reduced_edge.value))
 
                             # record another conflict
                             # based on this moat edge
@@ -309,10 +341,14 @@ class MorrisN4Dc(object):
                             # and has negative value is detected. Since it itself is already
                             # a negative cycle.
                             if (relevant_edge.fro == relevant_edge.to and relevant_edge.value < 0):
+                                # print("Reduction conflict detected")
+                                # print('Neg edge: with value ' + str(relevant_edge.value))
                                 return relevant_edge
 
-        #for edge in list(new_edges):
-        #    print '   %s' % (edge,)
+        # for edge in list(new_edges):
+        #    print('   %s' % (edge,))
+
+        print((len(new_edges) > 0))
 
         return list(new_edges)
 
@@ -357,10 +393,15 @@ class MorrisN4Dc(object):
         if include_combined:
             # print('NValue: ' + str(neg_value))
             big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
+            if not self.includeReductionCycle:
+                conflicts = []
             conflicts.append(big_conflict)
         else:
             # print('Nedge: ' + str(neg_value))
-            combine_expressions([get_edge_expression(edge) for edge in edge_list])
+            big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
+            if not self.includeReductionCycle:
+                conflicts = []
+                conflicts.append(big_conflict)
 
         # print("Extracted " + str(len(conflicts)) + " cycles")
         return conflicts
@@ -439,6 +480,7 @@ class MorrisN4Dc(object):
             # try to reduce all the lower case edges.
             for e in all_edges:
                 if e.edge_type == EdgeType.LOWER_CASE:
+                    print("Reducing Lower case edge " + str(e.fro) + "-->" + str(e.to))
                     reduced_edges = self.reduce_lower_case(num_nodes,
                                                            all_edges,
                                                            potentials,
@@ -446,7 +488,6 @@ class MorrisN4Dc(object):
 
                     if type(reduced_edges) is DistanceGraphEdge:
                         potential_conflict = self.extract_conflict([reduced_edges],include_combined=False)
-                        # print("Conflict detected during reduction")
                         return potential_conflict
 
                     new_edges.extend(reduced_edges)

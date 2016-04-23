@@ -108,6 +108,10 @@ class Candidate(object):
             relaxation.pretty_print()
 
     def json_print(self,problemName,solverName,runTime):
+
+        return json.dumps(self.json_description(problemName,solverName,runTime))
+
+    def json_description(self,problemName,solverName,runTime):
         result = {}
 
         result['TestName'] = problemName
@@ -115,6 +119,7 @@ class Candidate(object):
         result['Runtime'] = runTime
 
         result['Utility'] = self.utility
+        result['Conflicts'] = len(self.resolved_conflicts)
 
         assignmentsObj = []
         for assignment in self.assignments:
@@ -131,6 +136,7 @@ class Candidate(object):
         for relaxation in self.temporal_relaxations:
             relaxationObj = {}
             relaxationObj['ConstraintID'] = relaxation.constraint.id
+            relaxationObj['ConstraintName'] = relaxation.constraint.name
 
             if relaxation.relaxed_ub is not None:
                 relaxationObj['Bound'] = "UB"
@@ -147,4 +153,4 @@ class Candidate(object):
         if len(relaxationsObj) > 0:
             result['Relaxations'] = relaxationsObj
 
-        return json.dumps(result)
+        return result
