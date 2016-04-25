@@ -1,7 +1,7 @@
 from gurobipy import *
 from temporal_network.tpnu import Tpnu
 from tpn.tpn_autogen import tpn as ParseTpnClass, guard
-from friends.utils.logging import initialize
+#from friends.utils.logging import initialize
 from search.candidate import Candidate
 from search.temporal_relaxation import TemporalRelaxation
 from temporal_network.temporal_constraint import TemporalConstraint
@@ -18,7 +18,7 @@ class MipEncode(object):
         pair_nodes = {}
         v_new_constraint = {}
         for e in self.network.temporal_constraints.values():
-            print(e.fro, e.to, e.get_lower_bound(), e.get_upper_bound(),e.controllable)
+            # print(e.fro, e.to, e.get_lower_bound(), e.get_upper_bound(),e.controllable)
             if e.controllable:
                 if e.get_upper_bound() > self.DEFALT:
                     self.network.temporal_constraints[e.id].upper_bound = self.DEFALT/10
@@ -187,7 +187,7 @@ class MipEncode(object):
             if e.activated:
                 if e.fro == 0 or e.to == 0:
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
-                print('a', e.fro, e.to, e.controllable, e.relaxable_lb, e.relaxable_ub, e.get_lower_bound(), e.get_upper_bound())
+                # print('a', e.fro, e.to, e.controllable, e.relaxable_lb, e.relaxable_ub, e.get_lower_bound(), e.get_upper_bound())
                 if e.controllable:
                     
                     # Make sure no two edges share the same from and to nodes

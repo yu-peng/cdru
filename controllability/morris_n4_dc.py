@@ -188,7 +188,7 @@ class MorrisN4Dc(object):
                 edges_on_cycle.append(edge)
                 nvalue += edge.value
                 # print(str(fro) + '->' + str(to) + ':' + str(edge.value))
-            print('Cycle size: ' + str(len(edges_on_cycle)) + ' with value ' + str(nvalue))
+            # print('Cycle size: ' + str(len(edges_on_cycle)) + ' with value ' + str(nvalue))
 
             if nvalue > 0:
                 raise Exception('Positive cycle value detected!');
@@ -279,8 +279,6 @@ class MorrisN4Dc(object):
 
         # print('processing LCE %s' % (lc_edge,))
 
-        edge_nodes = {}
-
         while not q.empty():
             _, node = q.get()
             if visited[node]:
@@ -295,12 +293,8 @@ class MorrisN4Dc(object):
                     # add calculate reduced edge that lead us here
                     if reduced_edge[node] is None:
                         new_reduced_edge = edge
-                        edge_nodes[new_reduced_edge] = [edge.fro,edge.to]
                     else:
                         new_reduced_edge = self.reduce_edge(reduced_edge[node], edge)
-                        edge_nodes[new_reduced_edge] = edge_nodes[reduced_edge[node]] + [edge.to]
-                        # print(str(reduced_edge[node].fro) + "-->" + str(reduced_edge[node].to) + "-->" + str(edge.to) + '/' +
-                        #       str(reduced_edge[node].value) + "+" + str(edge.value) + "=" + str(new_reduced_edge.value)+ str(edge_nodes[new_reduced_edge]))
 
                     if new_reduced_edge is None:
                         # cannot make a reduction
@@ -325,7 +319,6 @@ class MorrisN4Dc(object):
                         if relevant_edge is not None:
                             #print '^^ moat ^^'
                             new_edges.add(relevant_edge)
-                            print("Negative edge detected " + str(new_reduced_edge.value))
 
                             # record another conflict
                             # based on this moat edge
@@ -347,8 +340,6 @@ class MorrisN4Dc(object):
 
         # for edge in list(new_edges):
         #    print('   %s' % (edge,))
-
-        print((len(new_edges) > 0))
 
         return list(new_edges)
 
@@ -480,7 +471,7 @@ class MorrisN4Dc(object):
             # try to reduce all the lower case edges.
             for e in all_edges:
                 if e.edge_type == EdgeType.LOWER_CASE:
-                    print("Reducing Lower case edge " + str(e.fro) + "-->" + str(e.to))
+                    # print("Reducing Lower case edge " + str(e.fro) + "-->" + str(e.to))
                     reduced_edges = self.reduce_lower_case(num_nodes,
                                                            all_edges,
                                                            potentials,

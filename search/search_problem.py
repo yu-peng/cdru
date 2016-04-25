@@ -117,12 +117,23 @@ class SearchProblem(object):
                         #     break
                         # if inconsistent, extract and record a conflict,
                         self.known_conflicts.add(new_conflict)
-                        print("new conflict: " + str(len(self.known_conflicts)));
+                        # print("new conflict: " + str(len(self.known_conflicts)));
                         # and put the back to the queue
                         self.add_candidate_to_queue(candidate)
 
                     else:
                         # if consistent, return the candidate as a feasible solution
+
+                        if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                            maxFlex = 99999
+                            self.implement(candidate)
+                            for id in self.tpnu.temporal_constraints:
+                                constraint = self.tpnu.temporal_constraints[id]
+                                if not constraint.controllable:
+                                    if constraint.get_upper_bound() - constraint.get_lower_bound() < maxFlex:
+                                        maxFlex = constraint.get_upper_bound() - constraint.get_lower_bound()
+
+                            candidate.utility = maxFlex
                         return candidate
 
         return None
@@ -551,7 +562,6 @@ class SearchProblem(object):
                 if new_candidate is not None:
                     new_candidate.resolved_conflicts.add(conflict)
                     new_candidate.continuously_resolved_cycles.add(negative_cycle)
-
                     # Override the utility to reflex the max-flexibility enabled by this candidate
                     new_candidate.utility = max_flex_value
                     self.add_candidate_to_queue(new_candidate)
@@ -645,8 +655,8 @@ class SearchProblem(object):
     def consistent(self,candidate):
         # Check if this candidate results
         # in a consistent temporal network
-        print('------Consistency check')
-        candidate.pretty_print()
+        # print('------Consistency check')
+        # candidate.pretty_print()
 
         self.implement(candidate)
 
@@ -672,7 +682,7 @@ class SearchProblem(object):
             # reformat the conflict
             kirk_conflict = Conflict()
             kirk_conflict.add_negative_cycles(conflict,self.tpnu)
-            kirk_conflict.pretty_print()
+            # kirk_conflict.pretty_print()
             # print("Conflict size: " + str(len(kirk_conflict.negative_cycles)))
             return kirk_conflict
 

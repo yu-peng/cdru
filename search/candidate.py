@@ -114,43 +114,43 @@ class Candidate(object):
     def json_description(self,problemName,solverName,runTime):
         result = {}
 
-        result['TestName'] = problemName
-        result['Solver'] = solverName
-        result['Runtime'] = runTime
+        result["TestName"] = problemName
+        result["Solver"] = solverName
+        result["Runtime"] = runTime
 
-        result['Utility'] = self.utility
-        result['Conflicts'] = len(self.resolved_conflicts)
+        result["Utility"] = self.utility
+        result["Conflicts"] = len(self.resolved_conflicts)
 
         assignmentsObj = []
         for assignment in self.assignments:
             assignmentObj = {}
-            assignmentObj['Variable'] = assignment.decision_variable.name
-            assignmentObj['Value'] = assignment.value
-            assignmentObj['Utility'] = assignment.utility
+            assignmentObj["Variable"] = assignment.decision_variable.name
+            assignmentObj["Value"] = assignment.value
+            assignmentObj["Utility"] = assignment.utility
             assignmentsObj.append(assignmentObj)
 
         if len(assignmentsObj) > 0:
-            result['Assignments'] = assignmentsObj
+            result["Assignments"] = assignmentsObj
 
         relaxationsObj = []
         for relaxation in self.temporal_relaxations:
             relaxationObj = {}
-            relaxationObj['ConstraintID'] = relaxation.constraint.id
-            relaxationObj['ConstraintName'] = relaxation.constraint.name
+            relaxationObj["ConstraintID"] = relaxation.constraint.id
+            relaxationObj["ConstraintName"] = relaxation.constraint.name
 
             if relaxation.relaxed_ub is not None:
-                relaxationObj['Bound'] = "UB"
-                relaxationObj['OriginalValue'] = relaxation.constraint.upper_bound
-                relaxationObj['RelaxedValue'] = relaxation.relaxed_ub
+                relaxationObj["Bound"] = "UB"
+                relaxationObj["OriginalValue"] = relaxation.constraint.upper_bound
+                relaxationObj["RelaxedValue"] = relaxation.relaxed_ub
 
             if relaxation.relaxed_lb is not None:
-                relaxationObj['Bound'] = "LB"
-                relaxationObj['OriginalValue'] = relaxation.constraint.lower_bound
-                relaxationObj['RelaxedValue'] = relaxation.relaxed_lb
+                relaxationObj["Bound"] = "LB"
+                relaxationObj["OriginalValue"] = relaxation.constraint.lower_bound
+                relaxationObj["RelaxedValue"] = relaxation.relaxed_lb
 
             relaxationsObj.append(relaxationObj)
 
         if len(relaxationsObj) > 0:
-            result['Relaxations'] = relaxationsObj
+            result["Relaxations"] = relaxationsObj
 
         return result
