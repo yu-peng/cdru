@@ -47,7 +47,7 @@ class BenchmarkRCPSP():
         solutions = []
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
-                solutionDesc = BenchmarkRCPSP.runTest(examples_dir,i,SolverType.MIP,ObjectiveType.MIN_COST)
+                solutionDesc = BenchmarkRCPSP.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
                 print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
@@ -74,7 +74,7 @@ class BenchmarkRCPSP():
 
         p = Process(target=BenchmarkRCPSP.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
         p.start()
-        p.join(60)
+        p.join(120)
         if p.is_alive():
             print("Solver is running... No solution found in time limit...")
             # Terminate foo

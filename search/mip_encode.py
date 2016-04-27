@@ -1,4 +1,4 @@
-from gurobipy import *
+# from gurobipy import *
 from temporal_network.tpnu import Tpnu
 from tpn.tpn_autogen import tpn as ParseTpnClass, guard
 from friends.utils.logging import initialize
