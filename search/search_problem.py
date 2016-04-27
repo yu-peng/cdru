@@ -117,12 +117,23 @@ class SearchProblem(object):
                         #     break
                         # if inconsistent, extract and record a conflict,
                         self.known_conflicts.add(new_conflict)
-
+                        # print("new conflict: " + str(len(self.known_conflicts)));
                         # and put the back to the queue
                         self.add_candidate_to_queue(candidate)
 
                     else:
                         # if consistent, return the candidate as a feasible solution
+
+                        if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                            maxFlex = 99999
+                            self.implement(candidate)
+                            for id in self.tpnu.temporal_constraints:
+                                constraint = self.tpnu.temporal_constraints[id]
+                                if not constraint.controllable:
+                                    if constraint.get_upper_bound() - constraint.get_lower_bound() < maxFlex:
+                                        maxFlex = constraint.get_upper_bound() - constraint.get_lower_bound()
+
+                            candidate.utility = maxFlex
                         return candidate
 
         return None
@@ -256,7 +267,7 @@ class SearchProblem(object):
         # 0 is infeasible
         # Note that this variable is shared by PuLP for its result
         status = 1;
-
+        # print("Cycles: " + str(len(all_cycles)))
         for cycle in all_cycles:
 
             lp_ncycle_constraint = []
@@ -283,6 +294,8 @@ class SearchProblem(object):
                         # lower bound, the domain is less than the original LB
                         # if the constraint is not relaxable, fix its domain
                         if constraint.relaxable_lb:
+                            # print("LB cost " + str(constraint.relax_cost_lb) + "/" + constraint.name)
+
                             if constraint.controllable:
                                 variable = LpVariable(constraint.id + "-LB",None,constraint.lower_bound)
                                 # print("New LB VAR: " + str(variable) + " [" + str(None) + "," + str(constraint.lower_bound) + "]")
@@ -310,6 +323,8 @@ class SearchProblem(object):
                         # upper bound, the domain is larger than the original UB
                         # if the constraint is not relaxable, fix its domain
                         if constraint.relaxable_ub:
+                            # print("UB cost " + str(constraint.relax_cost_ub) + "/" + constraint.name)
+
                             if constraint.controllable:
                                 variable = LpVariable(constraint.id + "-UB",constraint.upper_bound, None)
                                 # print("New UB VAR: " + str(variable) + " [" + str(constraint.upper_bound) + "," + str(None) + "]")
@@ -342,7 +357,7 @@ class SearchProblem(object):
             if sum(lp_ncycle_constraint) >= 0:
                 # print(str(sum(lp_ncycle_constraint)) + " >= 0")
                 # Over relax a bit to account for precision issues
-                prob += sum(lp_ncycle_constraint) >= 0.0001
+                prob += sum(lp_ncycle_constraint) >= 0.0
             else:
                 status = 0;
                 # this is not resolvable
@@ -547,7 +562,6 @@ class SearchProblem(object):
                 if new_candidate is not None:
                     new_candidate.resolved_conflicts.add(conflict)
                     new_candidate.continuously_resolved_cycles.add(negative_cycle)
-
                     # Override the utility to reflex the max-flexibility enabled by this candidate
                     new_candidate.utility = max_flex_value
                     self.add_candidate_to_queue(new_candidate)
@@ -642,6 +656,7 @@ class SearchProblem(object):
         # Check if this candidate results
         # in a consistent temporal network
         # print('------Consistency check')
+        # candidate.pretty_print()
 
         self.implement(candidate)
 
@@ -667,7 +682,7 @@ class SearchProblem(object):
             # reformat the conflict
             kirk_conflict = Conflict()
             kirk_conflict.add_negative_cycles(conflict,self.tpnu)
-            kirk_conflict.pretty_print()
+            # kirk_conflict.pretty_print()
             # print("Conflict size: " + str(len(kirk_conflict.negative_cycles)))
             return kirk_conflict
 

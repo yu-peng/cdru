@@ -14,6 +14,7 @@ class MipEncode(object):
         self.objective_type = obj_type;
         self.DEFALT = 100000
         
+        
         # no two links share the same end nodes
         pair_nodes = {}
         v_new_constraint = {}
@@ -38,17 +39,22 @@ class MipEncode(object):
         self.initialize()
         
         #print a dot file
-#         f = open('1.dot', 'w')
-#         f.write('digraph G {\n nodesep = .45; \n size = 30;\n label="CCTP";\n')
-#         
-#         for e in self.network.temporal_constraints.values():
-#             if e.activated:
-#                 f.write('"%s"->"%s"[ label = "[%s,%s] %d"];'%(e.fro, e.to,e.get_lower_bound(),e.get_upper_bound(),e.controllable))
-#             
-#         f.write("}")
-#         f.close()
+        f = open('1.dot', 'w')
+        f.write('digraph G {\n nodesep = .45; \n size = 30;\n label="CCTP";\n')
+         
+        for e in self.network.temporal_constraints.values():
+            if e.activated:
+                f.write('"%s"->"%s"[ label = "[%s,%s] %d"];'%(e.fro, e.to,e.get_lower_bound(),e.get_upper_bound(),e.controllable))
+             
+        f.write("}")
+        f.close()
         # self.mip_solver()
         
+    def estimate_defult(self):
+        for e in self.network.temporal_constraints.values():
+            if e.get_upper_bound() * 10 > self.DEFALT:
+                self.DEFALT = e.get_upper_bound()*10
+                
     def initialize(self):
         if type(self.network) == ParseTpnClass:
             self.network = Tpnu.from_tpn_autogen(self.network)
@@ -88,20 +94,32 @@ class MipEncode(object):
  
         for e in self.network.temporal_constraints.values():
             if e.controllable:
-                tmp_lb = -self.DEFALT/20
-                tmp_ub = self.DEFALT/20
+                tmp_lb = -self.DEFALT/10
+                tmp_ub = self.DEFALT/10
                 if tmp_lb < e.get_lower_bound():
                     tmp_lb = e.get_lower_bound()
                 if tmp_ub > e.get_upper_bound():
                     tmp_ub = e.get_upper_bound()
-                self.dis[(e.fro, e.to)] = (tmp_lb, tmp_ub)
-                self.dis[(e.to, e.fro)] = (-tmp_ub, -tmp_lb)
+                if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                    self.dis[(e.fro, e.to)] = (tmp_lb, tmp_ub)
+                    self.dis[(e.to, e.fro)] = (-tmp_ub, -tmp_lb)
+                else:
+                    if e.relaxable_lb:
+                        tmp_lb = -self.DEFALT/10
+                    if e.relaxable_ub:
+                        tmp_ub = self.DEFALT/10
+                    self.dis[(e.fro, e.to)] = (tmp_lb, tmp_ub)
+                    self.dis[(e.to, e.fro)] = (-tmp_ub, -tmp_lb)
             else:
-                self.dis[(e.fro, e.to)] = (e.get_lower_bound(), self.DEFALT/10)
-                # self.dis[(e.to, e.fro)] = (-e.get_upper_bound(), -e.get_lower_bound())
+                if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
+                    self.dis[(e.fro, e.to)] = (e.get_lower_bound(), self.DEFALT/10)
+                else:
+                    #continue
+                    self.dis[(e.fro, e.to)] = (e.get_lower_bound(), e.get_upper_bound())
+                    self.dis[(e.to, e.fro)] = (-e.get_upper_bound(), -e.get_lower_bound())
         
       
-        return  
+       # return  
         for node_k in range(1, self.num_nodes + 1):
             for node_i in range(1, self.num_nodes + 1):
                 for node_j in range(1, self.num_nodes + 1):
@@ -570,8 +588,8 @@ class MipEncode(object):
             # create a new model
             m = Model("mip_encode")
             m.params.outputflag = 0
-#            m.params.feasibilitytol = 1e-9
-#            m.params.intfeastol = 1e-9
+           # m.params.feasibilitytol = 1e-9
+           # m.params.intfeastol = 1e-9
             # add variables
             self.add_vars(m)
             self.add_additional_vars(m)
@@ -588,7 +606,7 @@ class MipEncode(object):
             else:
                 m.setObjective(self.objexp, GRB.MINIMIZE)
             m.update()
-           # m.write("1.lp")
+            m.write("1.lp")
             m.optimize()
             
             if m.status == GRB.Status.INF_OR_UNBD:
@@ -596,7 +614,7 @@ class MipEncode(object):
                 m.optimize()
             
             if m.status == GRB.Status.OPTIMAL:
-             #   m.write("1.sol")
+                m.write("1.sol")
                 m.fixed()
                 return self.get_solution(m)
             if m.status != GRB.Status.INFEASIBLE:

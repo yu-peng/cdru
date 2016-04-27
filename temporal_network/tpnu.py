@@ -14,6 +14,7 @@ class Tpnu(object):
         self.decision_variables = {}
         self.temporal_constraints = {}
         self.node_number_to_id = {}
+        self.start_node = 0;
 
     def add_decision_variable(self, variable):
         self.decision_variables[variable.id] = variable
@@ -73,6 +74,9 @@ class Tpnu(object):
             tpnu.node_id_to_number[eid] = next_number
 
         tpnu.num_nodes = len(tpnu.node_number_to_id)
+
+        start_id = e.find('START').text
+        tpnu.start_node = tpnu.node_id_to_number[start_id]
 
         if (tpnu.num_nodes < 1):
             return None

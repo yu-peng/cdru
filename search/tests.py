@@ -21,70 +21,123 @@ class SearchTests(unittest.TestCase):
 
     # used in most of the tests.
     def assert_cdru_result(self, example_file, expected_result):
-        for solver in DynamicControllability.SOLVERS:
+        path = join(self.examples_dir, example_file)
 
-            path = join(self.examples_dir, example_file)
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
 
-            if Tpnu.isCCTP(path):
-                tpnu = Tpnu.parseCCTP(path)
-            elif Tpnu.isTPN(path):
-                obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-                tpnu = Tpnu.from_tpn_autogen(obj)
-            else:
-                raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+        startTime = datetime.now()
+        search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
+        search_problem.initialize()
 
-            startTime = datetime.now()
-            search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
-            search_problem.initialize()
+        solution = search_problem.next_solution()
 
-            solution = search_problem.next_solution()
+        runtime = datetime.now() - startTime
 
-            runtime = datetime.now() - startTime
-
-            print("----------------------------------------")
-            if solution is not None:
-                print(example_file)
-                # solution.pretty_print()
-                print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
-            else:
-                print(example_file)
-                print(None)
-                search_problem.pretty_print()
-            is_feasible = solution is not None
-            self.assertEqual(is_feasible, expected_result)
+        print("----------------------------------------")
+        if solution is not None:
+            print(example_file)
+            solution.pretty_print()
+            # print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
+        else:
+            print(example_file)
+            print(None)
+            search_problem.pretty_print()
+        is_feasible = solution is not None
+        self.assertEqual(is_feasible, expected_result)
 
     # used in most of the tests.
+    def assert_mip_result(self, example_file, expected_result):
+        path = join(self.examples_dir, example_file)
+
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
+        startTime = datetime.now()
+        mip_solver = MipEncode(tpnu,ObjectiveType.MIN_COST)
+        solution = mip_solver.mip_solver()
+
+        runtime = datetime.now() - startTime
+
+        print("----------------------------------------")
+        if solution is not None:
+            print(example_file)
+            solution.pretty_print()
+            # print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
+        else:
+            print(example_file)
+            print(None)
+            #search_problem.pretty_print()
+        is_feasible = solution is not None
+        self.assertEqual(is_feasible, expected_result)
+
     def assert_max_flex_result(self, example_file, expected_result):
-        for solver in DynamicControllability.SOLVERS:
+        path = join(self.examples_dir, example_file)
 
-            path = join(self.examples_dir, example_file)
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
 
-            if Tpnu.isCCTP(path):
-                tpnu = Tpnu.parseCCTP(path)
-            elif Tpnu.isTPN(path):
-                obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-                tpnu = Tpnu.from_tpn_autogen(obj)
-            else:
-                raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+        search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MAX_FLEX_UNCERTAINTY)
+        search_problem.initialize()
 
-            search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MAX_FLEX_UNCERTAINTY)
-            search_problem.initialize()
+        solution = search_problem.next_solution()
 
-            solution = search_problem.next_solution()
+        print("----------------------------------------")
+        if solution is not None:
+            print(example_file)
+            solution.pretty_print()
+        else:
+            print(example_file)
+            print(None)
+            search_problem.pretty_print()
+        is_feasible = solution is not None
+        self.assertEqual(is_feasible, expected_result)
 
-            print("----------------------------------------")
-            if solution is not None:
-                print(example_file)
-                solution.pretty_print()
-            else:
-                print(example_file)
-                print(None)
-                search_problem.pretty_print()
-            is_feasible = solution is not None
-            self.assertEqual(is_feasible, expected_result)
-        
+
+    def compare_cdru_mip(self, example_file, expected_result):
+        path = join(self.examples_dir, example_file)
+
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
+        search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MAX_FLEX_UNCERTAINTY)
+        search_problem.initialize()
+
+        solution = search_problem.next_solution()
+
+        print("----------------------------------------")
+        if solution is not None:
+            print(example_file)
+            solution.pretty_print()
+        else:
+            print(example_file)
+            print(None)
+            search_problem.pretty_print()
+        is_feasible = solution is not None
+        self.assertEqual(is_feasible, expected_result)
+
         # test mip_encode
-        
+
         if Tpnu.isCCTP(path):
             tpnu = Tpnu.parseCCTP(path)
         elif Tpnu.isTPN(path):
@@ -107,10 +160,35 @@ class SearchTests(unittest.TestCase):
         else:
             print(example_file)
             print(None)
-          #  search_problem.pretty_print()
-        #is_feasible = solution is not None
-        #self.assertEqual(is_feasible, expected_result)
-            
+
+    def assert_mip_maxflex_result(self, example_file, expected_result):
+        path = join(self.examples_dir, example_file)
+
+        if Tpnu.isCCTP(path):
+            tpnu = Tpnu.parseCCTP(path)
+        elif Tpnu.isTPN(path):
+            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            tpnu = Tpnu.from_tpn_autogen(obj)
+        else:
+            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+
+        startTime = datetime.now()
+        mip_solver = MipEncode(tpnu,ObjectiveType.MAX_FLEX_UNCERTAINTY)
+        solution = mip_solver.mip_solver()
+
+        runtime = datetime.now() - startTime
+
+        print("----------------------------------------")
+        if solution is not None:
+            print(example_file)
+            solution.pretty_print()
+            # print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
+        else:
+            print(example_file)
+            print(None)
+            #search_problem.pretty_print()
+        is_feasible = solution is not None
+        self.assertEqual(is_feasible, expected_result)
             
 #     def test_cdru_basic(self):
 #         self.assert_cdru_result('test1.tpn', True)
@@ -179,7 +257,17 @@ class SearchTests(unittest.TestCase):
         self.assert_max_flex_result('PSP100.SCH3.cctp', True)
 
     def test_redline_schedule(self):
-        self.assert_cdru_result('Route_Red_1_testwithstop_3.cctp', True)
+        self.assert_cdru_result('Route_Red_Headway_2_Stop_4.cctp', True)
+        # self.assert_mip_result('Route_Red_Headway_2_Stop_4.cctp', True)
+
+    def test_MIP_RCPSP(self):
+        self.assert_mip_maxflex_result('PSP1.SCH3.cctp', True)
+
+    def test_CDRU_RCPSP(self):
+        self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+
+    def test_CDRU_Evacuation(self):
+        self.assert_max_flex_result('81r.cctp', True)
 
     def test_tpn_zipcar11(self):
  
