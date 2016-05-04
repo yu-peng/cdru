@@ -13,7 +13,7 @@ class MorrisN4Dc(object):
     def __init__(self):
         self.edge_support = {}
         self.moat_edges = set()
-        self.includeReductionCycle = False
+        self.includeReductionCycle = True
         self.start_node = 0;
 
     def generate_graph_from_tpnu(self, network):
@@ -164,12 +164,12 @@ class MorrisN4Dc(object):
                     weights[pair] = e.value
 
         # Like in Johnson's algorithm we add node 0 artificially
-        # for node in range(1, num_nodes + 1):
-        #     weights[(0,node)] = 0
-        #     neighbor_list[0].add(node)
+        for node in range(1, num_nodes + 1):
+            weights[(0,node)] = 0
+            neighbor_list[0].add(node)
 
-        weights[(0,self.start_node)] = 0
-        neighbor_list[0].add(self.start_node)
+        # weights[(0,self.start_node)] = 0
+        # neighbor_list[0].add(self.start_node)
 
         distances, negative_cycle = spfa(source = 0,
                                      num_nodes=num_nodes + 1,

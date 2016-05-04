@@ -264,7 +264,8 @@ class SearchTests(unittest.TestCase):
         self.assert_mip_maxflex_result('PSP1.SCH3.cctp', True)
 
     def test_CDRU_RCPSP(self):
-        self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+        # self.assert_max_flex_result('PSP1.SCH3.cctp', True)
+        self.assert_max_flex_result('PSP189.SCH2.cctp', True)
 
     def test_CDRU_Evacuation(self):
         self.assert_max_flex_result('81r.cctp', True)

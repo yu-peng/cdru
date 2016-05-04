@@ -62,7 +62,21 @@ class BenchmarkRCPSP():
         else:
             print(file + " not solved in " + str(runtime))
 
-        return solution.json_description(file,"CDRU+PuLP",runtime.total_seconds())
+        return solution.json_description(file,BenchmarkRCPSP.getSolveName(solver),runtime.total_seconds())
+
+    @staticmethod
+    def getSolveName(solver):
+        if solver == SolverType.CDRU:
+            try:
+                import gurobipy
+                return "CDRU+GuRoBi"
+            except ImportError:
+                pass
+            return "CDRU+PuLP"
+        elif solver == SolverType.MIP:
+            return "MIP+GuRoBi"
+        else:
+            raise Exception('Unknown solver type')
 
 if __name__ == "__main__":
     BenchmarkRCPSP.main()

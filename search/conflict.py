@@ -23,18 +23,23 @@ class Conflict(object):
         # of some constraints
 
         negative_cycle = NegativeCycle()
+        hasRelaxable = False
         for base_expression, coefficient in expression.items():
-
             constraint_type, edge_id = base_expression
             constraint = tpnu.temporal_constraints[edge_id]
             if constraint_type == EdgeSupport.LOWER:
                 negative_cycle.add_constraint(constraint, 0, coefficient)
+                if constraint.relaxable_lb:
+                    hasRelaxable = True
             else:
                 negative_cycle.add_constraint(constraint, 1, coefficient)
+                if constraint.relaxable_ub:
+                    hasRelaxable = True
 
             self.add_guard_assignments(constraint.guards)
 
-        self.negative_cycles.add(negative_cycle)
+        if hasRelaxable:
+            self.negative_cycles.add(negative_cycle)
 
     def add_negative_cycles(self,cycles,tpnu):
         # print("Adding " + str(len(cycles)) + " cycles")

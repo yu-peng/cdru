@@ -1,7 +1,7 @@
-# from gurobipy import *
+from gurobipy import *
 from temporal_network.tpnu import Tpnu
 from tpn.tpn_autogen import tpn as ParseTpnClass, guard
-from friends.utils.logging import initialize
+# from friends.utils.logging import initialize
 from search.candidate import Candidate
 from search.temporal_relaxation import TemporalRelaxation
 from temporal_network.temporal_constraint import TemporalConstraint

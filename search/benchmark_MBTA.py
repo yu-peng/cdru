@@ -37,7 +37,7 @@ class SolutionContainer(object):
 
 MyManager.register('SolutionContainer', SolutionContainer, exposed = ['update', 'get_value'])
 
-class BenchmarkRCPSP():
+class BenchmarkMBTA():
 
     @staticmethod
     def main():
@@ -47,7 +47,7 @@ class BenchmarkRCPSP():
         solutions = []
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
-                solutionDesc = BenchmarkRCPSP.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
+                solutionDesc = BenchmarkMBTA.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
                 print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
@@ -72,9 +72,9 @@ class BenchmarkRCPSP():
         manager = Manager()
         container = manager.SolutionContainer()
 
-        p = Process(target=BenchmarkRCPSP.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
+        p = Process(target=BenchmarkMBTA.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
         p.start()
-        p.join(120)
+        p.join(600)
         if p.is_alive():
             print("Solver is running... No solution found in time limit...")
             # Terminate foo
@@ -94,7 +94,7 @@ class BenchmarkRCPSP():
         else:
             result = {}
             result["TestName"] = file
-            result["Solver"] = BenchmarkRCPSP.getSolveName(solver)
+            result["Solver"] = BenchmarkMBTA.getSolveName(solver)
             result["Runtime"] = runtime.total_seconds()
             result["Error"] = "No Solution Found"
 
@@ -113,7 +113,7 @@ class BenchmarkRCPSP():
             raise Exception('Unknown solver type')
 
         runtime = datetime.now() - startTime
-        container.update(solution.json_description(filename,BenchmarkRCPSP.getSolveName(solver),runtime.total_seconds()))
+        container.update(solution.json_description(filename,BenchmarkMBTA.getSolveName(solver),runtime.total_seconds()))
 
 
     @staticmethod
