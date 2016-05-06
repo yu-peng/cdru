@@ -47,7 +47,7 @@ class BenchmarkMBTA():
         solutions = []
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
-                solutionDesc = BenchmarkMBTA.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
+                solutionDesc = BenchmarkMBTA.runTest(examples_dir,i,SolverType.MIP,ObjectiveType.MIN_COST)
                 print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
@@ -131,4 +131,4 @@ class BenchmarkMBTA():
             raise Exception('Unknown solver type')
 
 if __name__ == "__main__":
-    BenchmarkRCPSP.main()
+    BenchmarkMBTA.main()

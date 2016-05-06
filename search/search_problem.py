@@ -257,6 +257,7 @@ class SearchProblem(object):
                         new_candidate.continuously_resolved_cycles.add(negative_cycle)
                         # Override the utility to reflex the max-flexibility enabled by this candidate
                         new_candidate.utility = max_flex_value
+                        # new_candidate.pretty_print()
                         self.add_candidate_to_queue(new_candidate)
             else:
                 raise Exception("Unknown objective type: " + str(self.objective_type))

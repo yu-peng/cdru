@@ -453,10 +453,10 @@ class MipEncode(object):
                         # relax a ctg means tightening the bounds
                         if e.relaxable_lb:
                             #print(self.l[(e.fro, e.to)] )
-                            self.objexp += (self.rl[(e.fro, e.to)] )*e.relax_cost_lb
+                            self.objexp -= (self.rl[(e.fro, e.to)] )*e.relax_cost_lb
                             #self.objexp += (self.l[(e.fro, e.to)] - self.dis[(e.fro, e.to)][0])*e.relax_cost_lb
                         if e.relaxable_ub:
-                            self.objexp += (self.ru[(e.fro, e.to)])*e.relax_cost_ub
+                            self.objexp -= (self.ru[(e.fro, e.to)])*e.relax_cost_ub
 
                             # self.objexp += -(self.u[(e.fro, e.to)] - self.dis[(e.fro, e.to)][1])*e.relax_cost_ub
                 else:
@@ -465,11 +465,11 @@ class MipEncode(object):
                     if e.relaxable_lb:
                         # print(self.l[(e.fro, e.to)])
                         m.addConstr(self.l[(e.fro, e.to)] >= 0)
-                        self.objexp += (self.rl[(e.fro, e.to)] )*e.relax_cost_lb
+                        self.objexp -= (self.rl[(e.fro, e.to)] )*e.relax_cost_lb
                         #self.objexp += -(self.l[(e.fro, e.to)] - self.dis[(e.fro, e.to)][0])*e.relax_cost_lb
                     if e.relaxable_ub:
                         #print(self.ru[(e.fro, e.to)],e.relax_cost_ub)
-                        self.objexp += (self.ru[(e.fro, e.to)])*(e.relax_cost_ub)
+                        self.objexp -= (self.ru[(e.fro, e.to)])*(e.relax_cost_ub)
                         #self.objexp += (self.u[(e.fro, e.to)] - self.dis[(e.fro, e.to)][1])*e.relax_cost_ub
 
         for (node_a, node_b) in self.wait_pair:
@@ -729,7 +729,7 @@ class MipEncode(object):
             if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
                 m.setObjective(self.Z + 0.0, GRB.MAXIMIZE)
             else:
-                m.setObjective(self.objexp, GRB.MINIMIZE)
+                m.setObjective(self.objexp, GRB.MAXIMIZE)
             m.update()
             m.write("1.lp")
             m.optimize()
