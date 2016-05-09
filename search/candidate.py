@@ -24,6 +24,9 @@ class Candidate(object):
 
     def add_assignment(self,new_assignment):
 
+        if new_assignment in self.assignments:
+            return True
+
         # if its guard is in conflict with existing assignments, return false
         if not self.add_guard_assignments(new_assignment.decision_variable.guards):
             return False
@@ -38,7 +41,6 @@ class Candidate(object):
             if existing_assignment.decision_variable is new_assignment.decision_variable:
                 if not existing_assignment is new_assignment:
                     return False
-
 
         self.assignments.add(new_assignment)
         self.utility += new_assignment.utility
