@@ -257,8 +257,12 @@ class SearchTests(unittest.TestCase):
         self.assert_max_flex_result('PSP100.SCH3.cctp', True)
 
     def test_redline_schedule(self):
-        self.assert_cdru_result('Route_Red_Headway_2_Stop_4.cctp', True)
-        # self.assert_mip_result('Route_Red_Headway_2_Stop_4.cctp', True)
+        self.assert_cdru_result('Route_Red_Headway_2_Stop_3.cctp', True)
+        # self.assert_mip_result('Route_Red_Headway_2_Stop_3.cctp', True)
+
+    def test_auv_schedule(self):
+        self.assert_cdru_result('AUV-10.cctp', True)
+        self.assert_cdru_result('AUV-24.cctp', True)
 
     def test_MIP_RCPSP(self):
         self.assert_mip_maxflex_result('PSP1.SCH3.cctp', True)

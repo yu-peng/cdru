@@ -13,7 +13,7 @@ class MorrisN4Dc(object):
     def __init__(self):
         self.edge_support = {}
         self.moat_edges = set()
-        self.includeReductionCycle = True
+        self.includeReductionCycle = False
         self.start_node = 0;
 
     def generate_graph_from_tpnu(self, network):

@@ -87,10 +87,12 @@ class SearchProblem(object):
 
             # dequeue the current candidate
             candidate = self.queue.get()
-            # print("Dequeue candidate: " + str(self.queue.qsize()))
+            # print("Dequeue candidate: " + str(candidate.f) + "/" + str(candidate.g) + "\n")
             # candidate.pretty_print()
 
             # check if it has resolved all conflicts
+            # unresolved_conflict = None
+            # if self.check_complete(candidate) is None:
             unresolved_conflict = self.check_conflict_resolution(candidate)
 
             # if not, get an unresolved conflict and expand on it
@@ -107,7 +109,6 @@ class SearchProblem(object):
                     self.expand_on_variable(candidate,unassigned_variable)
 
                 else:
-
                     # if complete, check if it is consistent
                     new_conflict = self.consistent(candidate)
 
@@ -220,13 +221,6 @@ class SearchProblem(object):
         # TODO: and update the available variable list
         # TODO: and make sure that assignment_to_avoid is set properly
 
-        # Only compute continuous relaxation
-        # if no discrete relaxation is available
-        # since it is a very expensive operation
-
-        if found_discrete_relaxation:
-            return
-
 
         # continuous resolution
         # we compute one optimal continuous relaxation
@@ -275,7 +269,8 @@ class SearchProblem(object):
         else:
             # get an unassigned variable
             # with the highest expected utility
-            variable = candidate.unassigned_variables.get()
+            variable = candidate.unassigned_variables.queue[0]
+            # candidate.unassigned_variables.put(variable)
             return variable
 
 
@@ -283,7 +278,6 @@ class SearchProblem(object):
 
         # expand the candidate using the
         # assignments to the variable
-
         for domain_assignment in variable.domain:
 
             # create a new candidate
@@ -309,14 +303,14 @@ class SearchProblem(object):
         new_candidate.add_temporal_relaxations(candidate.temporal_relaxations)
         new_candidate.add_semantic_relaxations(candidate.semantic_relaxations)
 
-        # with this new assignment, find all available variables
+        # with this new assignment, find all available/unassigned variables
         for variable in self.tpnu.decision_variables.values():
             # it must not have been assigned
             if not variable in new_candidate.assigned_variables:
                 # and the guard must have been satisfied
-                if variable.guards <= new_candidate.assignments:
+                if len(variable.guards) == 0 or variable.guards <= new_candidate.assignments:
                     new_candidate.unassigned_variables.put(variable)
-                    new_candidate.utility += variable.optimal_utility
+                    new_candidate.g += variable.optimal_utility
 
         return new_candidate
 
@@ -344,9 +338,9 @@ class SearchProblem(object):
             # it must not have been assigned
             if not variable in new_candidate.assigned_variables:
                 # and the guard must have been satisfied
-                if variable.guards <= new_candidate.assignments:
+                if len(variable.guards) == 0 or variable.guards <= new_candidate.assignments:
                     new_candidate.unassigned_variables.put(variable)
-                    new_candidate.utility += variable.optimal_utility
+                    new_candidate.g += variable.optimal_utility
 
         return new_candidate
 

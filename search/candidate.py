@@ -8,7 +8,8 @@ class Candidate(object):
     def __init__(self):
         self.assignments = set()
         self.temporal_relaxations = set()
-        self.utility = 0
+        self.f = 0 # reward/cost so far
+        self.g = 0 # max reward/min cost to go
 
         self.resolved_conflicts = set()
         self.continuously_resolved_cycles = set()
@@ -20,7 +21,7 @@ class Candidate(object):
         self.semantic_relaxations = set()
 
     def __lt__(self, other):
-        return self.utility > other.utility
+        return (self.f + self.g) > (other.f + other.g)
 
     def add_assignment(self,new_assignment):
 
@@ -43,7 +44,7 @@ class Candidate(object):
                     return False
 
         self.assignments.add(new_assignment)
-        self.utility += new_assignment.utility
+        self.f += new_assignment.utility
         self.assigned_variables.add(new_assignment.decision_variable)
 
         return True
@@ -63,10 +64,10 @@ class Candidate(object):
 
         self.temporal_relaxations.add(new_relaxation)
         if new_relaxation.relaxed_lb is not None:
-            self.utility -= abs(new_relaxation.relaxed_lb - new_relaxation.constraint.lower_bound) * new_relaxation.constraint.relax_cost_lb
+            self.f -= abs(new_relaxation.relaxed_lb - new_relaxation.constraint.lower_bound) * new_relaxation.constraint.relax_cost_lb
 
         if new_relaxation.relaxed_ub is not None:
-            self.utility -= abs(new_relaxation.relaxed_ub - new_relaxation.constraint.upper_bound) * new_relaxation.constraint.relax_cost_ub
+            self.f -= abs(new_relaxation.relaxed_ub - new_relaxation.constraint.upper_bound) * new_relaxation.constraint.relax_cost_ub
 
         return True
 
@@ -94,7 +95,7 @@ class Candidate(object):
         return True
 
     def pretty_print(self):
-        print("Candidate ("+ str(self.utility) +")")
+        print("Candidate ("+ str(self.f) + "/" + str(self.g) +")")
 
         print("Assignment# "+ str(len(self.assignments)) +"  Relaxation# " + str(len(self.temporal_relaxations)))
         print("Resolved Conflict# "+ str(len(self.resolved_conflicts)) +"  Cont Resolved# " + str(len(self.continuously_resolved_cycles)))
@@ -120,7 +121,7 @@ class Candidate(object):
         result["Solver"] = solverName
         result["Runtime"] = runTime
 
-        result["Utility"] = self.utility
+        result["Utility"] = self.f
         result["Conflicts"] = len(self.resolved_conflicts)
 
         assignmentsObj = []
@@ -128,7 +129,7 @@ class Candidate(object):
             assignmentObj = {}
             assignmentObj["Variable"] = assignment.decision_variable.name
             assignmentObj["Value"] = assignment.value
-            assignmentObj["Utility"] = assignment.utility
+            assignmentObj["Utility"] = assignment.f
             assignmentsObj.append(assignmentObj)
 
         if len(assignmentsObj) > 0:
