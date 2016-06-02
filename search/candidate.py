@@ -8,6 +8,7 @@ class Candidate(object):
     def __init__(self):
         self.assignments = set()
         self.temporal_relaxations = set()
+        self.temporal_allocations = set()
         self.f = 0 # reward/cost so far
         self.g = 0 # max reward/min cost to go
 
@@ -78,6 +79,23 @@ class Candidate(object):
 
         return True
 
+    def add_temporal_allocation(self,new_allocation):
+
+        # check if the guard of this relaxation is in conflict with any existing assignment
+        if not self.add_guard_assignments(new_allocation.constraint.guards):
+            return False
+
+        self.temporal_allocations.add(new_allocation)
+
+        return True
+
+    def add_temporal_allocations(self,new_allocations):
+        for new_allocation in new_allocations:
+            if not self.add_temporal_allocation(new_allocation):
+                return False
+
+        return True
+
     def add_semantic_relaxation(self, semantic_relaxation):
         self.semantic_relaxations.add(semantic_relaxation)
 
@@ -107,14 +125,17 @@ class Candidate(object):
         for relaxation in self.temporal_relaxations:
             relaxation.pretty_print()
 
+        for allocation in self.temporal_allocations:
+            allocation.pretty_print()
+
         for relaxation in self.semantic_relaxations:
             relaxation.pretty_print()
 
-    def json_print(self,problemName,solverName,runTime):
+    def json_print(self,problemName,solverName,runTime,candidates):
 
-        return json.dumps(self.json_description(problemName,solverName,runTime))
+        return json.dumps(self.json_description(problemName,solverName,runTime,candidates))
 
-    def json_description(self,problemName,solverName,runTime):
+    def json_description(self,problemName,solverName,runTime,candidates):
         result = {}
 
         result["TestName"] = problemName
@@ -122,6 +143,7 @@ class Candidate(object):
         result["Runtime"] = runTime
 
         result["Utility"] = self.f
+        result["Candidates"] = candidates
         result["Conflicts"] = len(self.resolved_conflicts)
 
         assignmentsObj = []
@@ -129,7 +151,7 @@ class Candidate(object):
             assignmentObj = {}
             assignmentObj["Variable"] = assignment.decision_variable.name
             assignmentObj["Value"] = assignment.value
-            assignmentObj["Utility"] = assignment.f
+            assignmentObj["Utility"] = assignment.value
             assignmentsObj.append(assignmentObj)
 
         if len(assignmentsObj) > 0:
@@ -155,5 +177,24 @@ class Candidate(object):
 
         if len(relaxationsObj) > 0:
             result["Relaxations"] = relaxationsObj
+
+        allocationsObj = []
+        for allocation in self.temporal_allocations:
+            allocationObj = {}
+            allocationObj["ConstraintID"] = allocation.constraint.id
+            allocationObj["ConstraintName"] = allocation.constraint.name
+
+            if allocation.allocated_ub is not None:
+                allocationObj["Bound"] = "UB"
+                allocationObj["AllocatedValue"] = allocation.allocated_ub
+
+            if allocation.allocated_lb is not None:
+                allocationObj["Bound"] = "LB"
+                allocationObj["AllocatedValue"] = allocation.allocated_lb
+
+                allocationsObj.append(relaxationObj)
+
+        if len(allocationsObj) > 0:
+            result["Allocations"] = allocationsObj
 
         return result

@@ -5,6 +5,15 @@ from temporal_network.decision_variable import DecisionVariable
 from temporal_network.assignment import Assignment
 import xml.etree.ElementTree
 
+class FeasibilityType(object):
+    CONSISTENCY = 1
+    STRONG_CONTROLLABILITY = 2
+    DYNAMIC_CONTROLLABILITY = 3
+
+class ObjectiveType(object):
+    MIN_COST = 1
+    MAX_FLEX_UNCERTAINTY = 2
+
 class Tpnu(object):
 
     def __init__(self, id, name):

@@ -7,12 +7,14 @@ from math import fabs
 from tpn import Tpn
 from controllability.dynamic_controllability import DynamicControllability
 from temporal_network.tpnu import Tpnu
-from search.search_problem import SearchProblem, FeasibilityType, ObjectiveType
+from search.search_problem import SearchProblem
+from temporal_network.tpnu import FeasibilityType, ObjectiveType
 from temporal_network.decision_variable import DecisionVariable
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.assignment import Assignment
 from search.mip_encode import MipEncode
 from datetime import datetime
+import cProfile
 
 class SearchTests(unittest.TestCase):
     def setUp(self):
@@ -34,8 +36,12 @@ class SearchTests(unittest.TestCase):
         startTime = datetime.now()
         search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MIN_COST)
         search_problem.initialize()
-
+        # pr = cProfile.Profile()
+        # pr.enable()
         solution = search_problem.next_solution()
+        # pr.disable()
+        # # after your program ends
+        # pr.print_stats(sort="cumtime")
 
         runtime = datetime.now() - startTime
 
@@ -44,6 +50,9 @@ class SearchTests(unittest.TestCase):
             print(example_file)
             solution.pretty_print()
             # print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
+
+            print("Conflicts " + str(len(search_problem.known_conflicts)))
+            print("Candidates " + str(search_problem.candidates_dequeued))
         else:
             print(example_file)
             print(None)
@@ -261,8 +270,15 @@ class SearchTests(unittest.TestCase):
         # self.assert_mip_result('Route_Red_Headway_2_Stop_3.cctp', True)
 
     def test_auv_schedule(self):
+        self.assert_cdru_result('AUV-1.cctp', True)
+        self.assert_cdru_result('AUV-2.cctp', True)
+        self.assert_cdru_result('AUV-3.cctp', True)
+        self.assert_cdru_result('AUV-4.cctp', True)
         self.assert_cdru_result('AUV-10.cctp', True)
         self.assert_cdru_result('AUV-24.cctp', True)
+        self.assert_cdru_result('AUV-100.cctp', True)
+        self.assert_cdru_result('AUV-105.cctp', True)
+        # self.assert_cdru_result('AUV-1000.cctp', True)
 
     def test_MIP_RCPSP(self):
         self.assert_mip_maxflex_result('PSP1.SCH3.cctp', True)

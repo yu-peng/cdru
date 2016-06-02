@@ -12,6 +12,10 @@ class TemporalConstraint(object):
         self.upper_bound = upper_bound
         self.guards = set()
         self.controllable = True
+        self.probabilistic = False
+
+        self.mean = 0
+        self.variance = 0
 
         self.activated = False
         self.relaxed_lb = None

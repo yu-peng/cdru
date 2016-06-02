@@ -1,5 +1,6 @@
 from controllability.strong_controllability import StrongControllability
 from controllability.temporal_consistency import TemporalConsistency
+from search.cc_relaxation import ChanceConstrainedRelaxation
 
 __author__ = 'yupeng'
 
@@ -9,15 +10,7 @@ from controllability.dynamic_controllability import DynamicControllability
 from search.conflict import Conflict
 from search.maxflex_relaxation import MaxFlexRelaxation
 from search.mincost_relaxation import MinCostRelaxation
-
-class FeasibilityType(object):
-    CONSISTENCY = 1
-    STRONG_CONTROLLABILITY = 2
-    DYNAMIC_CONTROLLABILITY = 3
-
-class ObjectiveType(object):
-    MIN_COST = 1
-    MAX_FLEX_UNCERTAINTY = 2
+from temporal_network.tpnu import FeasibilityType, ObjectiveType
 
 class SearchProblem(object):
 
@@ -27,6 +20,7 @@ class SearchProblem(object):
         self.known_conflicts = set()
         self.feasibility_type = f_type
         self.objective_type = o_type
+        self.candidates_dequeued = 0;
 
         if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
             # Preprocess the uncontrollable durations in the tpnu
@@ -87,6 +81,9 @@ class SearchProblem(object):
 
             # dequeue the current candidate
             candidate = self.queue.get()
+            self.candidates_dequeued += 1
+            # print(str(self.candidates_dequeued) + "\t" + str(candidate.f))
+
             # print("Dequeue candidate: " + str(candidate.f) + "/" + str(candidate.g) + "\n")
             # candidate.pretty_print()
 
@@ -233,7 +230,9 @@ class SearchProblem(object):
             # plus this new one
 
             if self.objective_type == ObjectiveType.MIN_COST:
-                relaxations,utility = MinCostRelaxation.generate_mincost_relaxations(candidate,negative_cycle)
+                # relaxations,utility = MinCostRelaxation.generate_mincost_relaxations(candidate,negative_cycle,self.feasibility_type)
+                relaxations,utility = ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,negative_cycle,self.feasibility_type)
+
                 # we construct new candidates using this relaxations
                 new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
                 if new_candidate is not None:
@@ -250,7 +249,8 @@ class SearchProblem(object):
                         new_candidate.resolved_conflicts.add(conflict)
                         new_candidate.continuously_resolved_cycles.add(negative_cycle)
                         # Override the utility to reflex the max-flexibility enabled by this candidate
-                        new_candidate.utility = max_flex_value
+                        new_candidate.f = max_flex_value
+                        # print("New flex value: " + str(new_candidate.f))
                         # new_candidate.pretty_print()
                         self.add_candidate_to_queue(new_candidate)
             else:
@@ -351,7 +351,6 @@ class SearchProblem(object):
         # candidate.pretty_print()
 
         self.implement(candidate)
-
         # return either a conflict, or None
         # run the dc checking algorithm
         # TODO: fix the conflict extraction code
@@ -396,6 +395,9 @@ class SearchProblem(object):
 
         for relaxation in candidate.temporal_relaxations:
             relaxation.implement()
+
+        for allocation in candidate.temporal_allocations:
+            allocation.implement()
 
     def add_candidate_to_queue(self, candidate):
         self.queue.put(candidate)

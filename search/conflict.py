@@ -95,3 +95,34 @@ class NegativeCycle(object):
 
     def add_constraint(self,constraint, bound, coefficient):
         self.constraints[(constraint,bound)] = coefficient
+
+    def pretty_print(self):
+        PLUS = ' + '
+        MINUS = ' - '
+        expression_str = []
+        curr_value = 0
+
+        for constraint, bound in self.constraints.keys():
+
+            coefficient = self.constraints[(constraint, bound)]
+
+            if coefficient >= 0:
+                expression_str.append(PLUS)
+            else:
+                expression_str.append(MINUS)
+
+            if bound == 0:
+                expression_str.append('%d%s(%s:%s->%s)[%.4f,%.4f]' % (
+                abs(coefficient), 'LB', constraint.name, constraint.fro, constraint.to, constraint.lower_bound,
+                constraint.upper_bound))
+                curr_value += coefficient * constraint.get_lower_bound()
+            elif bound == 1:
+                expression_str.append('%d%s(%s:%s->%s)[%.4f,%.4f]' % (
+                abs(coefficient), 'UB', constraint.name, constraint.fro, constraint.to, constraint.lower_bound,
+                constraint.upper_bound))
+                curr_value += coefficient * constraint.get_upper_bound()
+
+        expression_str.append(' = ' + str(curr_value))
+
+        print(''.join(expression_str))
+

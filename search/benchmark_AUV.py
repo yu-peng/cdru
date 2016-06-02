@@ -38,22 +38,29 @@ class SolutionContainer(object):
 
 MyManager.register('SolutionContainer', SolutionContainer, exposed = ['update', 'get_value'])
 
-class BenchmarkMBTA():
+class BenchmarkAUV():
 
     @staticmethod
     def main():
         cdru_dir = dirname(__file__)
-        examples_dir = join(cdru_dir, join('..', 'benchmark/MBTA/'))
+        # examples_dir = join(cdru_dir, join('..', 'benchmark/MBTA/'))
+        # examples_dir = 'E:/Dropbox/Code/Algorithms/TestGenerator/tests/AUV/'
+        # examples_dir = 'C:/Users/yupeng/Dropbox/Code/Algorithms/TestGenerator/tests/AUV/'
+        # examples_dir = 'F:/BenchmarkCases/JAIR 2015/AUV/'
+        examples_dir = '/home/yupeng/Documents/AUV/'
 
         solutions = []
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
-                solutionDesc = BenchmarkMBTA.runTest(examples_dir,i,SolverType.MIP,ObjectiveType.MIN_COST)
+                solutionDesc = BenchmarkAUV.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
                 print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
         output = {"Results": solutions}
-        print(json.dumps(output))
+        text_file = open(examples_dir+"results-"+str(datetime.now().date())+".txt", "w")
+        text_file.write(json.dumps(output))
+        text_file.close()
+        # print(json.dumps(output))
 
     @staticmethod
     def runTest(directory,file,solver,objType):
@@ -73,9 +80,9 @@ class BenchmarkMBTA():
         manager = Manager()
         container = manager.SolutionContainer()
 
-        p = Process(target=BenchmarkMBTA.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
+        p = Process(target=BenchmarkAUV.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
         p.start()
-        p.join(600)
+        p.join(30)
         if p.is_alive():
             print("Solver is running... No solution found in time limit...")
             # Terminate foo
@@ -95,7 +102,7 @@ class BenchmarkMBTA():
         else:
             result = {}
             result["TestName"] = file
-            result["Solver"] = BenchmarkMBTA.getSolveName(solver)
+            result["Solver"] = BenchmarkAUV.getSolveName(solver)
             result["Runtime"] = runtime.total_seconds()
             result["Error"] = "No Solution Found"
 
@@ -104,7 +111,7 @@ class BenchmarkMBTA():
     @staticmethod
     def solve(tpnu,solver,objType,startTime,filename,container):
         if solver == SolverType.CDRU:
-            search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,objType)
+            search_problem = SearchProblem(tpnu,FeasibilityType.CONSISTENCY,objType)
             search_problem.initialize()
             solution = search_problem.next_solution()
         elif solver == SolverType.MIP:
@@ -114,7 +121,7 @@ class BenchmarkMBTA():
             raise Exception('Unknown solver type')
 
         runtime = datetime.now() - startTime
-        container.update(solution.json_description(filename,BenchmarkMBTA.getSolveName(solver),runtime.total_seconds()))
+        container.update(solution.json_description(filename,BenchmarkAUV.getSolveName(solver),runtime.total_seconds(),search_problem.candidates_dequeued))
 
 
     @staticmethod
@@ -125,11 +132,12 @@ class BenchmarkMBTA():
                 return "CDRU+GuRoBi"
             except ImportError:
                 pass
-            return "CDRU+PuLP"
+            # return "CDRU+PuLP"
+            return "CDRU+SNOPT"
         elif solver == SolverType.MIP:
             return "MIP+GuRoBi"
         else:
             raise Exception('Unknown solver type')
 
 if __name__ == "__main__":
-    BenchmarkMBTA.main()
+    BenchmarkAUV.main()

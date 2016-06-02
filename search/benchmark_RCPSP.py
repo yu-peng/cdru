@@ -6,7 +6,8 @@ import json
 from math import fabs
 from tpn import Tpn
 from temporal_network.tpnu import Tpnu
-from search.search_problem import SearchProblem, FeasibilityType, ObjectiveType
+from search.search_problem import SearchProblem
+from temporal_network.tpnu import FeasibilityType, ObjectiveType
 from datetime import datetime
 from search.mip_encode import MipEncode
 
@@ -62,7 +63,7 @@ class BenchmarkRCPSP():
         else:
             print(file + " not solved in " + str(runtime))
 
-        return solution.json_description(file,BenchmarkRCPSP.getSolveName(solver),runtime.total_seconds())
+        return solution.json_description(file,BenchmarkRCPSP.getSolveName(solver),runtime.total_seconds(),search_problem.candidates_dequeued)
 
     @staticmethod
     def getSolveName(solver):

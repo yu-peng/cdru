@@ -274,11 +274,11 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
         #        and edges on reductions of those edges (as well as reductions of
         #        edges on reductions and so on...)
 
-        neg_value = 0
-        for edge in edge_list:
-            neg_value += edge.value
+        # neg_value = 0
+        # for edge in edge_list:
+        #     neg_value += edge.value
 
-        # print('NValue: ' + str(neg_value))
+        # print('NValue: ' + str(neg_value) + "   / size: " + str(len(edge_list)))
         big_conflict = combine_expressions([get_edge_expression(edge) for edge in edge_list])
         conflicts.append(big_conflict)
 

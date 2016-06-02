@@ -14,13 +14,13 @@ class MorrisN4Dc(object):
         self.edge_support = {}
         self.moat_edges = set()
         self.includeReductionCycle = False
-        self.start_node = 0;
+        self.start_node = 0
 
     def generate_graph_from_tpnu(self, network):
         """Generates graph of edges from a tpnu"""
 
         num_nodes = network.num_nodes
-        self.start_node = network.start_node;
+        self.start_node = network.start_node
         edge_list = []
 
         if hasattr(network, 'node_number_to_id'):

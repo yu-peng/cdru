@@ -2,14 +2,17 @@ __author__ = 'yupeng'
 
 from pulp import solvers, LpProblem, LpMinimize, LpVariable, value
 from search.temporal_relaxation import TemporalRelaxation
+from temporal_network.tpnu import FeasibilityType
 
 class MinCostRelaxation():
 
     @staticmethod
-    def generate_mincost_relaxations(candidate,negative_cycle):
+    def generate_mincost_relaxations(candidate,negative_cycle,feasibility_type):
 
         all_cycles = candidate.continuously_resolved_cycles.copy()
         all_cycles.add(negative_cycle)
+
+        # print("Solving against " + str(len(all_cycles)) + " cycles")
 
         # Solve using PuLP, TODO, incorporate interface to other solvers,
         # especially for nonlinear objective functions
@@ -29,6 +32,7 @@ class MinCostRelaxation():
         status = 1;
         # print("Cycles: " + str(len(all_cycles)))
         for cycle in all_cycles:
+            # cycle.pretty_print()
 
             lp_ncycle_constraint = []
 
@@ -56,14 +60,14 @@ class MinCostRelaxation():
                         if constraint.relaxable_lb:
                             # print("LB cost " + str(constraint.relax_cost_lb) + "/" + constraint.name)
 
-                            if constraint.controllable:
+                            if constraint.controllable or feasibility_type == FeasibilityType.CONSISTENCY:
                                 variable = LpVariable(constraint.id + "-LB",None,constraint.lower_bound)
                                 # print("New LB VAR: " + str(variable) + " [" + str(None) + "," + str(constraint.lower_bound) + "]")
                                 # add the variable to the objective function
                                 lp_variables[(constraint,bound)] = variable
                                 lp_objective.append((constraint.lower_bound - variable) * constraint.relax_cost_lb)
                             else:
-                                variable = LpVariable(constraint.id + "-LB",constraint.lower_bound, constraint.upper_bound)
+                                variable = LpVariable(constraint.id + "-LB",constraint.lower_bound, constraint.upper_bound-0.001)
                                 # print("New LB-UC VAR: " + str(variable) + " [" + str(None) + "," + str(constraint.lower_bound) + "]")
                                 # add the variable to the objective function
                                 lp_variables[(constraint,bound)] = variable
@@ -75,7 +79,9 @@ class MinCostRelaxation():
                                     ub_variable = lp_variables[(constraint,1)]
                                     uncertain_duration_constraint = []
                                     uncertain_duration_constraint.append((ub_variable - variable))
-                                    prob += sum(uncertain_duration_constraint) >= 0
+                                    prob += sum(uncertain_duration_constraint) >= 0.001
+                                    # print("Adding domain constraint for " + constraint.name)
+
                         else:
                             variable = constraint.lower_bound
 
@@ -85,14 +91,14 @@ class MinCostRelaxation():
                         if constraint.relaxable_ub:
                             # print("UB cost " + str(constraint.relax_cost_ub) + "/" + constraint.name)
 
-                            if constraint.controllable:
+                            if constraint.controllable or feasibility_type == FeasibilityType.CONSISTENCY:
                                 variable = LpVariable(constraint.id + "-UB",constraint.upper_bound, None)
                                 # print("New UB VAR: " + str(variable) + " [" + str(constraint.upper_bound) + "," + str(None) + "]")
                                 # add the variable to the objective function
                                 lp_variables[(constraint,bound)] = variable
                                 lp_objective.append((variable - constraint.upper_bound) * constraint.relax_cost_ub)
                             else:
-                                variable = LpVariable(constraint.id + "-UB",constraint.lower_bound, constraint.upper_bound)
+                                variable = LpVariable(constraint.id + "-UB",constraint.lower_bound+0.001, constraint.upper_bound)
                                 # print("New UB-UC VAR: " + str(variable) + " [" + str(constraint.upper_bound) + "," + str(None) + "]")
                                 lp_variables[(constraint,bound)] = variable
                                 lp_objective.append((constraint.upper_bound - variable) * constraint.relax_cost_ub)
@@ -103,7 +109,8 @@ class MinCostRelaxation():
                                     lb_variable = lp_variables[(constraint,0)]
                                     uncertain_duration_constraint = []
                                     uncertain_duration_constraint.append((variable - lb_variable))
-                                    prob += sum(uncertain_duration_constraint) >= 0
+                                    prob += sum(uncertain_duration_constraint) >= 0.001
+                                    # print("Adding domain constraint for " + constraint.name)
                         else:
                             variable = constraint.upper_bound
 
@@ -163,6 +170,8 @@ class MinCostRelaxation():
                         relaxation.relaxed_lb = relaxed_bound
                         # relaxation.pretty_print()
                         relaxations.append(relaxation)
+                        assert relaxation.relaxed_lb <= constraint.upper_bound
+
 
                 elif bound == 1:
                     # same for upper bound
@@ -172,6 +181,9 @@ class MinCostRelaxation():
                         relaxation.relaxed_ub = relaxed_bound
                         # relaxation.pretty_print()
                         relaxations.append(relaxation)
+                        assert relaxation.relaxed_ub >= constraint.lower_bound
+
+            # print("")
 
             if len(relaxations) > 0:
                 return relaxations,0
