@@ -15,7 +15,7 @@ class TemporalConstraint(object):
         self.probabilistic = False
 
         self.mean = 0
-        self.variance = 0
+        self.std = 0
 
         self.activated = False
         self.relaxed_lb = None

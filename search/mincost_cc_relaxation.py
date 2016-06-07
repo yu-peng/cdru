@@ -1,3 +1,9 @@
+import scipy
+
+from search.chance_constraint_relaxation import ChanceConstraintRelaxation
+from search.temporal_allocation import TemporalAllocation
+from temporal_network.chance_constraint import ChanceConstraint
+
 __author__ = 'yupeng'
 
 from search.candidate import Candidate
@@ -7,11 +13,20 @@ from temporal_network.temporal_constraint import TemporalConstraint
 from search.temporal_relaxation import TemporalRelaxation
 import pysnopt.snopt as snopt
 import numpy as np
+from scipy.stats import norm, truncnorm
+
+prob_means = []
+prob_stds = []
 
 class ChanceConstrainedRelaxation():
 
     @staticmethod
-    def generate_cc_relaxations(candidate,negative_cycle,feasibility_type,pInfinity=1e6,nInfinity=-1e6):
+    def generate_cc_relaxations(candidate,negative_cycle,feasibility_type,cc,pInfinity=1e6,nInfinity=-1e6):
+
+        global prob_means
+        global prob_stds
+        global prob_vars
+        global cc_var
 
         all_cycles = candidate.continuously_resolved_cycles.copy()
         all_cycles.add(negative_cycle)
@@ -26,6 +41,7 @@ class ChanceConstrainedRelaxation():
         # construct variables and constraints
         variables = {}
         variable_bounds = {}
+        initial_values = {}
         constraints = []
         objective = {}
 
@@ -39,6 +55,10 @@ class ChanceConstrainedRelaxation():
         neG_count = 0
 
         prob_durations = set()
+        prob_means = []
+        prob_stds = []
+        prob_vars = []
+        cc_var = -1
 
         # status indicating the feasibility of the relaxation problem
         # 1 is feasible
@@ -73,10 +93,12 @@ class ChanceConstrainedRelaxation():
                         # lower bound, the domain is less than the original LB
                         # if the constraint is not relaxable, fix its domain
                         if constraint.relaxable_lb or (not constraint.controllable and constraint.probabilistic):
+                        # if constraint.relaxable_lb:
                             # print("LB cost " + str(constraint.relax_cost_lb) + "/" + constraint.name)
 
                             variable = numVar
                             variables[(constraint, bound)] = variable
+                            initial_values[variable] = constraint.get_lower_bound()
                             numVar += 1
 
                             if constraint.controllable or feasibility_type == FeasibilityType.CONSISTENCY:
@@ -129,11 +151,13 @@ class ChanceConstrainedRelaxation():
                     elif bound == 1:
                         # upper bound, the domain is larger than the original UB
                         # if the constraint is not relaxable, fix its domain
-                        if constraint.relaxable_ub:
+                        if constraint.relaxable_ub or (not constraint.controllable and constraint.probabilistic):
+                        # if constraint.relaxable_ub:
                             # print("UB cost " + str(constraint.relax_cost_ub) + "/" + constraint.name)
 
                             variable = numVar
                             variables[(constraint, bound)] = variable
+                            initial_values[variable] = constraint.get_upper_bound()
                             numVar += 1
 
                             if constraint.controllable or feasibility_type == FeasibilityType.CONSISTENCY:
@@ -215,9 +239,34 @@ class ChanceConstrainedRelaxation():
         # Create the chance constraint
         if len(prob_durations) > 0:
             cc_constraint = {}
-            cc_constraint['lb'] = 0
-            cc_constraint['ub'] = 0.05
             constraints.append(cc_constraint)
+
+            # Check if the chance constraint is relaxable
+            if cc.relaxable_bound:
+                cc_constraint['lb'] = -1
+                cc_constraint['ub'] = 0
+
+                # we need to encode an additional variable
+                # to represent cc
+                cc_var = numVar
+                variables[("CC", 1)] = cc_var
+                numVar += 1
+                variable_bounds[cc_var] = [cc.risk_bound, pInfinity]
+
+                list_iA.append(len(constraints))
+                list_jA.append(cc_var + 1)
+                list_A.append(-1)
+                neA_count += 1
+
+                # And add cc to the objective function
+                objective[cc_var] = [cc.relax_cost, -1 * cc.risk_bound * cc.relax_cost]
+
+            else:
+                cc_constraint['lb'] = 0
+                cc_constraint['ub'] = cc.risk_bound
+
+            # print("C" + str(len(constraints)) + " (CC): ", end="")
+            # print(str(cc_constraint['lb']) + "<= ", end="")
 
             for constraint in prob_durations:
 
@@ -237,8 +286,14 @@ class ChanceConstrainedRelaxation():
 
                 # override their domain since we are free to
                 # allocate any values for them
-                variable_bounds[lb_var] = [nInfinity, pInfinity]
-                variable_bounds[ub_var] = [nInfinity, pInfinity]
+                variable_bounds[lb_var] = [0, constraint.mean]
+                variable_bounds[ub_var] = [constraint.mean, pInfinity]
+
+                # initial_values[lb_var] = constraint.mean - 4*constraint.std
+                # initial_values[ub_var] = constraint.mean + 4*constraint.std
+
+                initial_values[lb_var] = constraint.get_lower_bound()
+                initial_values[ub_var] = constraint.get_upper_bound()
 
                 list_iG.append(len(constraints))
                 list_jG.append(lb_var + 1)
@@ -246,6 +301,15 @@ class ChanceConstrainedRelaxation():
                 list_iG.append(len(constraints))
                 list_jG.append(ub_var + 1)
                 neG_count += 1
+                prob_vars.append(lb_var)
+                prob_vars.append(ub_var)
+
+                # print("Risk((" + str(lb_var) + ")--"+str(constraint.mean)+"--"+str(constraint.std)+"--("+str(ub_var)+")) ", end="")
+
+                prob_means.append(constraint.mean)
+                prob_stds.append(constraint.std)
+
+            # print("<= " + str(cc_constraint['ub']))
 
         # Add the objective as the last constraint
         constraints.append(objective)
@@ -261,6 +325,8 @@ class ChanceConstrainedRelaxation():
         objective['lb'] = nInfinity
         objective['ub'] = pInfinity
 
+
+        # Start Constructing the problem!!
         # Solve using SNOPT
         snopt.check_memory_compatibility()
 
@@ -296,6 +362,8 @@ class ChanceConstrainedRelaxation():
         xupp = np.zeros((len(variables),), dtype=np.float64)
 
         for key in variable_bounds:
+            if key in initial_values:
+                x[key] = initial_values[key]
             bounds = variable_bounds[key]
             xlow[key] = bounds[0]
             xupp[key] = bounds[1]
@@ -385,6 +453,9 @@ class ChanceConstrainedRelaxation():
             iGfun = np.zeros((lenG[0],), dtype=np.int32)
             jGvar = np.zeros((lenG[0],), dtype=np.int32)
 
+        # Generate the usrf function for SNOPT
+
+
         # names for variables and constraints
         # By default no names provided (both set to 1)
         nxname = np.zeros((1,), dtype=np.int32)
@@ -468,66 +539,6 @@ class ChanceConstrainedRelaxation():
         # The user has the option of calling  snJac  to define the  */
         # coordinate arrays (iAfun,jAvar,A) and (iGfun, jGvar).     */
 
-        # print("Input parameters for snoptA")
-        # print(str(Cold))
-        # print(str(neF))
-        # print(str(n))
-        # print(str(nxname))
-        # print(str(nFname))
-        #
-        # print("Objs")
-        # print(str(ObjAdd))
-        # print(str(ObjRow))
-        # print(str(Prob))
-        # print(str(usrf))
-        #
-        # print("A matrix")
-        # print(str(iAfun))
-        # print(str(jAvar))
-        # print(str(A))
-        #
-        # print(str(lenA))
-        # print(str(neA))
-        #
-        # print("G matrix")
-        # print(str(iGfun))
-        # print(str(jGvar))
-        #
-        # print(str(lenG))
-        # print(str(neG))
-        #
-        # print("Bounds")
-        # print(str(xlow))
-        # print(str(xupp))
-        # print(str(xnames))
-        #
-        # print(str(Flow))
-        # print(str(Fupp))
-        # print(str(Fnames))
-        #
-        # print("States")
-        # print(str(x))
-        # print(str(xstate))
-        # print(str(xmul))
-        #
-        # print(str(F))
-        # print(str(Fstate))
-        # print(str(Fmul))
-        #
-        # print("INFO")
-        # print(str(INFO))
-        # print(str(mincw))
-        # print(str(miniw))
-        # print(str(minrw))
-        #
-        # print("Last row")
-        # print(str(nS))
-        # print(str(nInf))
-        # print(str(sInf))
-        # print(str(cw))
-        # print(str(iw))
-        # print(str(rw))
-
 
         #     ------------------------------------------------------------------ */
         #     Go for it, using a Cold start.                                     */
@@ -551,46 +562,88 @@ class ChanceConstrainedRelaxation():
 
         # print("Solution " + str(x))
 
-        if status > 0:
+        if INFO[0] == 1:
 
-            # A solution has been found
+            # An optimal solution has been found
             # extract the result and store them into a set of relaxation
             # the outcome is a set of relaxations
             relaxations = []
+            allocations = []
+            cc_relaxations = []
 
-            # print("Found relaxation")
+            # print("Found relaxation: INFO=" + str(INFO[0]))
+
             for constraint, bound in variables.keys():
                 variable = variables[(constraint, bound)]
                 relaxed_bound = x[variable]
                 # print(str(variable) + "==" + str(x[variable]))
 
-                if bound == 0:
-                    # check if this constraint bound is relaxed
-                    if relaxed_bound != constraint.lower_bound:
-                        # yes! create a new relaxation for it
-                        relaxation = TemporalRelaxation(constraint)
-                        relaxation.relaxed_lb = relaxed_bound
-                        # relaxation.pretty_print()
-                        relaxations.append(relaxation)
+                if constraint == "CC":
+                    # print("Relaxing CC from " + str(cc.risk_bound) + " to " + str(relaxed_bound))
 
-                elif bound == 1:
-                    # same for upper bound
-                    if relaxed_bound != constraint.upper_bound:
-                        # yes! create a new relaxation for it
-                        relaxation = TemporalRelaxation(constraint)
-                        relaxation.relaxed_ub = relaxed_bound
-                        # relaxation.pretty_print()
-                        relaxations.append(relaxation)
+                    if abs(relaxed_bound-cc.risk_bound) > 0.001:
+
+                        cc_relaxation = ChanceConstraintRelaxation(cc)
+                        cc_relaxation.relaxed_bound = relaxed_bound
+                        cc_relaxations.append(cc_relaxation)
+                    continue
+
+                if not constraint.controllable and constraint.probabilistic:
+
+                    # This is allocation
+                    # Both lb and ub variables must have been included in the calculation
+
+                    if bound == 0:
+                        lb_variable = variables[(constraint, 0)]
+                        ub_variable = variables[(constraint, 1)]
+                        allocated_lb = x[lb_variable]
+                        allocated_ub = x[ub_variable]
+
+                        allocation = TemporalAllocation(constraint)
+                        allocation.allocated_lb = allocated_lb
+                        allocation.allocated_ub = allocated_ub
+                        # allocation.pretty_print()
+                        allocations.append(allocation)
+
+                else:
+                    # This is relaxation
+                    if bound == 0:
+                        # check if this constraint bound is relaxed
+                        if abs(relaxed_bound - constraint.lower_bound) > 0.001:
+                            # yes! create a new relaxation for it
+                            relaxation = TemporalRelaxation(constraint)
+                            relaxation.relaxed_lb = relaxed_bound
+                            # relaxation.pretty_print()
+                            relaxations.append(relaxation)
+
+                    elif bound == 1:
+                        # same for upper bound
+                        if abs(relaxed_bound - constraint.upper_bound) > 0.001:
+                            # yes! create a new relaxation for it
+                            relaxation = TemporalRelaxation(constraint)
+                            relaxation.relaxed_ub = relaxed_bound
+                            # relaxation.pretty_print()
+                            relaxations.append(relaxation)
 
             # print("")
 
-            if len(relaxations) > 0:
-                return relaxations, 0
+            if len(relaxations) > 0 or len(allocations) > 0:
+                return relaxations, allocations, cc_relaxations, 0
 
-        return None, 0
+        return None, None, None, 0
+
+# def usrf(status, x, needF, neF, F, needG, neG, G, cu, iu, ru):
+#     """
+#     ==================================================================
+#     Computes the nonlinear objective and constraint terms for the
+#     problem.
+#     ==================================================================
+#     """
+#
+#     return 0
+
 
 def usrf(status, x, needF, neF, F, needG, neG, G, cu, iu, ru):
-
     """
     ==================================================================
     Computes the nonlinear objective and constraint terms for the
@@ -598,8 +651,51 @@ def usrf(status, x, needF, neF, F, needG, neG, G, cu, iu, ru):
     ==================================================================
     """
 
-    return 0
+    # print('called usrfun with ' + str(len(G)) + ' non-linear variables')
 
+    if (needF[0] != 0):
+        # the second last row is for chance constraint
+        F[neF[0] - 2] = 0
+
+        if cc_var > 0:
+            F[neF[0] - 2] += x[cc_var]
+
+        for idx in range(0, int(len(G)/ 2)):
+            mean = prob_means[idx]
+            sigma = prob_stds[idx]
+            lb_var = prob_vars[2 * idx]
+            ub_var = prob_vars[2 * idx+1]
+            # print("Mean: " + str(mean) + " / Sigma: " + str(sigma))
+
+            a, b = (0 - mean) / sigma, (1e6 - mean) / sigma
+
+            ub_survival = truncnorm.sf(x[ub_var],a,b, loc=mean, scale=sigma)
+            lb_mass = truncnorm.cdf(x[lb_var],a,b, loc=mean, scale=sigma)
+
+            F[neF[0] - 2] += ub_survival + lb_mass
+
+            # print('Updating F['+str(neF[0] - 2)+']: ' + str(x[lb_var]) + '-' + str(x[ub_var]) + ': ' + str(lb_mass) + "+" +str(ub_survival) + "="+str(F[neF[0] - 2]))
+
+    if (needG[0] != 0):
+        # Compute the partial derivatives of the chance constraint
+        # over the lower and upper bounds of the
+        # probabilistic durations
+        for idx in range(0, int(len(G) / 2)):
+            mean = prob_means[idx]
+            sigma = prob_stds[idx]
+            lb_var = prob_vars[2 * idx]
+            ub_var = prob_vars[2 * idx + 1]
+
+            a, b = (0 - mean) / sigma, (1e6 - mean) / sigma
+
+            # For the lower bound, the derivative is the Gaussian pdf
+            G[2 * idx] = truncnorm.pdf(x[lb_var], a,b, loc=mean, scale=sigma)
+
+            # For the upper bound, it is the negation of the Gaussian pdf
+            G[2 * idx + 1] = -1 * truncnorm.pdf(x[ub_var], a,b, loc=mean, scale=sigma)
+
+            # print('Updating G['+str(2 * idx)+']: ' + str(G[2 * idx]))
+            # print('Updating G['+str(2 * idx+1)+']: ' + str(G[2 * idx + 1]))
 
 if __name__ == "__main__":
 
@@ -609,23 +705,30 @@ if __name__ == "__main__":
     ev3 = 3
 
     ep1 = TemporalConstraint('ep-1','ep-1', ev1, ev2, 15,30)
-    ep2 = TemporalConstraint('ep-2','ep-2', ev2, ev3, 15,20)
-    ep3 = TemporalConstraint('ep-3','ep-3', ev1, ev3, 15,100)
+    ep2 = TemporalConstraint('ep-2','ep-2', ev2, ev3, 15,30)
+    ep3 = TemporalConstraint('ep-3','ep-3', ev1, ev3, 40,40)
     ep1.controllable = False
-    ep1.relaxable_lb = True
-    ep1.relaxable_ub = True
-    ep2.relaxable_lb = True
-    ep2.relaxable_ub = True
-    ep1.relax_cost_lb = 10
-    ep1.relax_cost_ub = 10
-    ep2.relax_cost_lb = 1
-    ep2.relax_cost_ub = 1
+    ep1.probabilistic = True
+    ep1.mean = 150
+    ep1.std = 5
 
+    ep2.controllable = False
+    ep2.probabilistic = True
+    ep2.mean = 150
+    ep2.std = 5
+
+    ep3.relaxable_ub = True
+    ep3.relax_cost_ub = 0.1
 
     new_cycle = NegativeCycle()
     new_cycle.add_constraint(ep1,0,1)
     new_cycle.add_constraint(ep1,1,-1)
-    new_cycle.add_constraint(ep2,0,-1)
-    new_cycle.add_constraint(ep2,1,1)
+    new_cycle.add_constraint(ep2,0,1)
+    new_cycle.add_constraint(ep2,1,-1)
+    new_cycle.add_constraint(ep3,1,1)
 
-    ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,new_cycle,FeasibilityType.STRONG_CONTROLLABILITY)
+    cc = ChanceConstraint("CC-1","CC-Constraint",0.05)
+    cc.relaxable_bound = True
+    cc.relax_cost = 100000
+
+    ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,new_cycle,FeasibilityType.STRONG_CONTROLLABILITY,cc)

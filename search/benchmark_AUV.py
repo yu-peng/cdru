@@ -5,7 +5,7 @@ from os import listdir
 import json
 from math import fabs
 from tpn import Tpn
-from temporal_network.tpnu import Tpnu
+from temporal_network.tpnu import Tpnu, ChanceConstrained
 from search.search_problem import SearchProblem
 from temporal_network.tpnu import FeasibilityType, ObjectiveType
 from datetime import datetime
@@ -42,6 +42,11 @@ class BenchmarkAUV():
 
     @staticmethod
     def main():
+
+        f_type = FeasibilityType.STRONG_CONTROLLABILITY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.ON
+
         cdru_dir = dirname(__file__)
         # examples_dir = join(cdru_dir, join('..', 'benchmark/MBTA/'))
         # examples_dir = 'E:/Dropbox/Code/Algorithms/TestGenerator/tests/AUV/'
@@ -52,7 +57,7 @@ class BenchmarkAUV():
         solutions = []
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
-                solutionDesc = BenchmarkAUV.runTest(examples_dir,i,SolverType.CDRU,ObjectiveType.MIN_COST)
+                solutionDesc = BenchmarkAUV.runTest(examples_dir,i,SolverType.CDRU,o_type,f_type,c_type)
                 print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
@@ -63,7 +68,7 @@ class BenchmarkAUV():
         # print(json.dumps(output))
 
     @staticmethod
-    def runTest(directory,file,solver,objType):
+    def runTest(directory,file,solver,objType,feaType,ccType):
         path = join(directory, file)
         print("----------------------------------------")
 
@@ -80,7 +85,7 @@ class BenchmarkAUV():
         manager = Manager()
         container = manager.SolutionContainer()
 
-        p = Process(target=BenchmarkAUV.solve, name="Solve", args=(tpnu,solver,objType,startTime,file,container,))
+        p = Process(target=BenchmarkAUV.solve, name="Solve", args=(tpnu,solver,objType,feaType,ccType,startTime,file,container,))
         p.start()
         p.join(30)
         if p.is_alive():
@@ -109,9 +114,9 @@ class BenchmarkAUV():
             return result
 
     @staticmethod
-    def solve(tpnu,solver,objType,startTime,filename,container):
+    def solve(tpnu,solver,objType,feaType,ccType,startTime,filename,container):
         if solver == SolverType.CDRU:
-            search_problem = SearchProblem(tpnu,FeasibilityType.CONSISTENCY,objType)
+            search_problem = SearchProblem(tpnu,feaType,objType,ccType)
             search_problem.initialize()
             solution = search_problem.next_solution()
         elif solver == SolverType.MIP:

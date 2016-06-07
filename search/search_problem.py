@@ -1,6 +1,6 @@
 from controllability.strong_controllability import StrongControllability
 from controllability.temporal_consistency import TemporalConsistency
-from search.cc_relaxation import ChanceConstrainedRelaxation
+from search.mincost_cc_relaxation import ChanceConstrainedRelaxation
 
 __author__ = 'yupeng'
 
@@ -10,16 +10,19 @@ from controllability.dynamic_controllability import DynamicControllability
 from search.conflict import Conflict
 from search.maxflex_relaxation import MaxFlexRelaxation
 from search.mincost_relaxation import MinCostRelaxation
-from temporal_network.tpnu import FeasibilityType, ObjectiveType
+from temporal_network.tpnu import FeasibilityType, ObjectiveType, ChanceConstrained
+
 
 class SearchProblem(object):
 
-    def __init__(self, tpnu, f_type, o_type):
+    def __init__(self, tpnu, f_type, o_type, c_type):
         self.tpnu = tpnu
         self.queue = PriorityQueue()
         self.known_conflicts = set()
         self.feasibility_type = f_type
         self.objective_type = o_type
+        self.chance_constrained = c_type
+
         self.candidates_dequeued = 0;
 
         if self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
@@ -30,6 +33,20 @@ class SearchProblem(object):
                 constraint = self.tpnu.temporal_constraints[key]
                 if not constraint.controllable:
                     constraint.upper_bound = 100000
+
+        if self.chance_constrained == ChanceConstrained.ON:
+            # Retrieve the only chance constraint
+            for key in self.tpnu.chance_constraints:
+                constraint = self.tpnu.chance_constraints[key]
+                self.cc = constraint
+
+            # initialize the bound of probabilistic durations to +- 6 sigma
+            for key in self.tpnu.temporal_constraints:
+                constraint = self.tpnu.temporal_constraints[key]
+                if not constraint.controllable and constraint.probabilistic:
+                    # print("Initializing " + constraint.name)
+                    constraint.upper_bound = constraint.mean + 6*constraint.std
+                    constraint.lower_bound = constraint.mean - 6*constraint.std
 
 
     def initialize(self):
@@ -228,23 +245,35 @@ class SearchProblem(object):
             # construct a LP to solve for this problem
             # the constraints are all previous negative cycles
             # plus this new one
-
+            self.implement(candidate)
             if self.objective_type == ObjectiveType.MIN_COST:
-                # relaxations,utility = MinCostRelaxation.generate_mincost_relaxations(candidate,negative_cycle,self.feasibility_type)
-                relaxations,utility = ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,negative_cycle,self.feasibility_type)
-
-                # we construct new candidates using this relaxations
-                new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
-                if new_candidate is not None:
-                    new_candidate.resolved_conflicts.add(conflict)
-                    new_candidate.continuously_resolved_cycles.add(negative_cycle)
-                    self.add_candidate_to_queue(new_candidate)
+                if self.chance_constrained == ChanceConstrained.ON:
+                    relaxations, allocations, cc_relaxations, utility = ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,
+                                                                                               negative_cycle,self.feasibility_type,self.cc)
+                    if relaxations is not None or allocations is not None:
+                        # we construct new candidates using the relaxations and allocations
+                        new_candidate = self.create_child_candidate_from_relaxations(candidate, relaxations=relaxations, allocations=allocations)
+                        if new_candidate is not None:
+                            if cc_relaxations is not None:
+                                new_candidate.add_chance_constraint_relaxations(cc_relaxations)
+                            new_candidate.resolved_conflicts.add(conflict)
+                            new_candidate.continuously_resolved_cycles.add(negative_cycle)
+                            self.add_candidate_to_queue(new_candidate)
+                else:
+                    relaxations,utility = MinCostRelaxation.generate_mincost_relaxations(candidate,negative_cycle,self.feasibility_type)
+                    if relaxations is not None:
+                        # we construct new candidates using this relaxations
+                        new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations=relaxations)
+                        if new_candidate is not None:
+                            new_candidate.resolved_conflicts.add(conflict)
+                            new_candidate.continuously_resolved_cycles.add(negative_cycle)
+                            self.add_candidate_to_queue(new_candidate)
 
             elif self.objective_type == ObjectiveType.MAX_FLEX_UNCERTAINTY:
                 relaxations,max_flex_value = MaxFlexRelaxation.generate_maxflex_relaxations(candidate,negative_cycle)
                 if relaxations is not None:
                     # we construct new candidates using this relaxations
-                    new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations)
+                    new_candidate = self.create_child_candidate_from_relaxations(candidate,relaxations=relaxations)
                     if new_candidate is not None:
                         new_candidate.resolved_conflicts.add(conflict)
                         new_candidate.continuously_resolved_cycles.add(negative_cycle)
@@ -314,7 +343,7 @@ class SearchProblem(object):
 
         return new_candidate
 
-    def create_child_candidate_from_relaxations(self,candidate,relaxations):
+    def create_child_candidate_from_relaxations(self,candidate,relaxations=None,allocations=None):
 
         new_candidate = Candidate()
 
@@ -327,11 +356,19 @@ class SearchProblem(object):
         # We do not need the following line as it adds duplicated relaxations to the
         # new candidate.
         # new_candidate.add_temporal_relaxations(candidate.temporal_relaxations)
-        for relaxation in relaxations:
-            if not new_candidate.add_temporal_relaxation(relaxation):
-                return None
-        new_candidate.add_semantic_relaxations(candidate.semantic_relaxations)
+        # Add temporal relaxations
+        if relaxations is not None:
+            for relaxation in relaxations:
+                if not new_candidate.add_temporal_relaxation(relaxation):
+                    return None
 
+        # Add temporal allocations
+        if allocations is not None:
+            for allocation in allocations:
+                if not new_candidate.add_temporal_allocation(allocation):
+                    return None
+
+        new_candidate.add_semantic_relaxations(candidate.semantic_relaxations)
 
         # find all available variables
         for variable in self.tpnu.decision_variables.values():

@@ -9,6 +9,7 @@ class Candidate(object):
         self.assignments = set()
         self.temporal_relaxations = set()
         self.temporal_allocations = set()
+        self.chance_constraint_relaxations = set()
         self.f = 0 # reward/cost so far
         self.g = 0 # max reward/min cost to go
 
@@ -103,6 +104,16 @@ class Candidate(object):
         for semantic_relaxation in semantic_relaxations:
             self.add_semantic_relaxation(semantic_relaxation)
 
+    def add_chance_constraint_relaxation(self,new_relaxation):
+        self.chance_constraint_relaxations.add(new_relaxation)
+        self.f -= abs(new_relaxation.relaxed_bound - new_relaxation.constraint.risk_bound) * new_relaxation.constraint.relax_cost
+
+    def add_chance_constraint_relaxations(self,new_relaxations):
+        for new_relaxation in new_relaxations:
+            self.add_chance_constraint_relaxation(new_relaxation)
+
+        return True
+
     def add_guard_assignments(self,guards):
         for guard in guards:
             if not self.add_assignment(guard):
@@ -115,7 +126,7 @@ class Candidate(object):
     def pretty_print(self):
         print("Candidate ("+ str(self.f) + "/" + str(self.g) +")")
 
-        print("Assignment# "+ str(len(self.assignments)) +"  Relaxation# " + str(len(self.temporal_relaxations)))
+        print("Assignment# "+ str(len(self.assignments)) +"  Relaxation# " + str(len(self.temporal_relaxations))+"  Allocation# " + str(len(self.temporal_allocations)))
         print("Resolved Conflict# "+ str(len(self.resolved_conflicts)) +"  Cont Resolved# " + str(len(self.continuously_resolved_cycles)))
         print("Assignment To Avoid# "+ str(len(self.assignments_to_avoid)) +"  Unassigned Var# " + str(self.unassigned_variables.qsize()))
 
@@ -127,6 +138,9 @@ class Candidate(object):
 
         for allocation in self.temporal_allocations:
             allocation.pretty_print()
+
+        for relaxation in self.chance_constraint_relaxations:
+            relaxation.pretty_print()
 
         for relaxation in self.semantic_relaxations:
             relaxation.pretty_print()
@@ -184,17 +198,27 @@ class Candidate(object):
             allocationObj["ConstraintID"] = allocation.constraint.id
             allocationObj["ConstraintName"] = allocation.constraint.name
 
-            if allocation.allocated_ub is not None:
-                allocationObj["Bound"] = "UB"
-                allocationObj["AllocatedValue"] = allocation.allocated_ub
+            allocationObj["AllocatedLB"] = allocation.allocated_lb
+            allocationObj["AllocatedUB"] = allocation.allocated_ub
 
-            if allocation.allocated_lb is not None:
-                allocationObj["Bound"] = "LB"
-                allocationObj["AllocatedValue"] = allocation.allocated_lb
-
-                allocationsObj.append(relaxationObj)
+            allocationsObj.append(allocationObj)
 
         if len(allocationsObj) > 0:
             result["Allocations"] = allocationsObj
+
+        cc_relaxationsObj = []
+        for relaxation in self.chance_constraint_relaxations:
+            relaxationObj = {}
+            relaxationObj["ConstraintID"] = relaxation.constraint.id
+            relaxationObj["ConstraintName"] = relaxation.constraint.name
+
+            if relaxation.relaxed_bound is not None:
+                relaxationObj["OriginalValue"] = relaxation.constraint.risk_bound
+                relaxationObj["RelaxedValue"] = relaxation.relaxed_bound
+
+                cc_relaxationsObj.append(relaxationObj)
+
+        if len(cc_relaxationsObj) > 0:
+            result["CCRelaxations"] = cc_relaxationsObj
 
         return result

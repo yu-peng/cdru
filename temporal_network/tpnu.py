@@ -1,14 +1,21 @@
+from temporal_network.chance_constraint import ChanceConstraint
+
 __author__ = 'yupeng'
 
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.decision_variable import DecisionVariable
 from temporal_network.assignment import Assignment
 import xml.etree.ElementTree
+import numpy as np
 
 class FeasibilityType(object):
     CONSISTENCY = 1
     STRONG_CONTROLLABILITY = 2
     DYNAMIC_CONTROLLABILITY = 3
+
+class ChanceConstrained(object):
+    ON = True
+    OFF = False
 
 class ObjectiveType(object):
     MIN_COST = 1
@@ -22,14 +29,18 @@ class Tpnu(object):
         self.num_nodes = 0
         self.decision_variables = {}
         self.temporal_constraints = {}
+        self.chance_constraints = {}
         self.node_number_to_id = {}
-        self.start_node = 0;
+        self.start_node = 0
 
     def add_decision_variable(self, variable):
         self.decision_variables[variable.id] = variable
 
     def add_temporal_constraint(self, constraint):
         self.temporal_constraints[constraint.id] = constraint
+
+    def add_chance_constraint(self, constraint):
+        self.chance_constraints[constraint.id] = constraint
 
     def initialize(self):
 
@@ -172,6 +183,14 @@ class Tpnu(object):
             elif "Uncontrollable" in type:
                 constraint.controllable = False
 
+            if constraint_obj.find('MEAN') is not None:
+                constraint.mean = float(constraint_obj.find('MEAN').text)
+
+            if constraint_obj.find('VARIANCE') is not None:
+                constraint.probabilistic = True
+                constraint.std = np.sqrt(float(constraint_obj.find('VARIANCE').text))
+
+
             if constraint_obj.find('LBRELAXABLE') is not None:
                 if "T" in constraint_obj.find('LBRELAXABLE').text:
                     constraint.relaxable_lb = True
@@ -203,6 +222,21 @@ class Tpnu(object):
 
 
             tpnu.add_temporal_constraint(constraint)
+
+        # Parse Chance Constraint
+        risk_bound = float(e.find('RISK-BOUND').text)
+        risk_bound_relax_cost = float(e.find('RISK-BOUND-RELAX-COST').text)
+
+        risk_bound = 0.05
+        risk_bound_relax_cost = 100
+
+        cc_constraint = ChanceConstraint("CC-1", "CC-Constraint", risk_bound)
+        if risk_bound_relax_cost > 0:
+            cc_constraint.relaxable_bound = True
+            cc_constraint.relax_cost = risk_bound_relax_cost
+            tpnu.add_chance_constraint(cc_constraint)
+
+        tpnu.start_node = tpnu.node_id_to_number[start_id]
 
         return tpnu
 
