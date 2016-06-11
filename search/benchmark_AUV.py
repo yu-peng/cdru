@@ -43,7 +43,7 @@ class BenchmarkAUV():
     @staticmethod
     def main():
 
-        f_type = FeasibilityType.STRONG_CONTROLLABILITY
+        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
         o_type = ObjectiveType.MIN_COST
         c_type = ChanceConstrained.ON
 
@@ -58,7 +58,7 @@ class BenchmarkAUV():
         for i in listdir(examples_dir):
             if i.endswith(".cctp"):
                 solutionDesc = BenchmarkAUV.runTest(examples_dir,i,SolverType.CDRU,o_type,f_type,c_type)
-                print(json.dumps(solutionDesc))
+                # print(json.dumps(solutionDesc))
                 solutions.append(solutionDesc)
 
         output = {"Results": solutions}
@@ -71,6 +71,7 @@ class BenchmarkAUV():
     def runTest(directory,file,solver,objType,feaType,ccType):
         path = join(directory, file)
         print("----------------------------------------")
+        print("Solving: " + file)
 
         if Tpnu.isCCTP(path):
             tpnu = Tpnu.parseCCTP(path)

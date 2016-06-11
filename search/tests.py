@@ -271,7 +271,8 @@ class SearchTests(unittest.TestCase):
         o_type = ObjectiveType.MIN_COST
         c_type = ChanceConstrained.ON
 
-        self.assert_cdru_result('AUV-2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('AUV-2364.cctp', f_type, o_type, c_type, True)
+        # self.assert_cdru_result('AUV-1.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-2.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-3.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-4.cctp', f_type, o_type, c_type, True)

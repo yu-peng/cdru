@@ -46,7 +46,7 @@ class SearchProblem(object):
                 if not constraint.controllable and constraint.probabilistic:
                     # print("Initializing " + constraint.name)
                     constraint.upper_bound = constraint.mean + 6*constraint.std
-                    constraint.lower_bound = constraint.mean - 6*constraint.std
+                    constraint.lower_bound = max(0,constraint.mean - 6*constraint.std)
 
 
     def initialize(self):
