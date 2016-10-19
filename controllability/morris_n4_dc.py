@@ -13,7 +13,7 @@ class MorrisN4Dc(object):
     def __init__(self):
         self.edge_support = {}
         self.moat_edges = set()
-        self.includeReductionCycle = False
+        self.includeReductionCycle = True
         self.start_node = 0
 
     def generate_graph_from_tpnu(self, network):
@@ -29,7 +29,7 @@ class MorrisN4Dc(object):
         def add_controllable(fro, to, lb, ub, edge_id):
 
             # lb cannot be larger than ub
-            assert lb <= ub
+            # assert lb <= ub
 
             ub_edge = DistanceGraphEdge(fro, to, ub, EdgeType.SIMPLE, renaming=renaming)
             lb_edge = DistanceGraphEdge(to, fro, -lb, EdgeType.SIMPLE, renaming=renaming)

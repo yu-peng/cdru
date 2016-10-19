@@ -1,20 +1,26 @@
-from gurobipy import *
 from temporal_network.tpnu import Tpnu
 from tpn.tpn_autogen import tpn as ParseTpnClass, guard
-# from friends.utils.logging import initialize
 from search.candidate import Candidate
 from search.temporal_relaxation import TemporalRelaxation
 from temporal_network.temporal_constraint import TemporalConstraint
 from temporal_network.tpnu import ObjectiveType
 
+try:
+    from gurobipy import *
+except ImportError:
+    raise Exception(
+        "Missing Gurobi subsolver on this system for MIP encoding. Check if you have it installed correctly.")
+
 class MipEncode(object):
     
     def __init__(self, tpnu, obj_type):
         self.network = tpnu
-        self.objective_type = obj_type;
+        self.objective_type = obj_type
         self.DEFAULT = 100000
         self.estimate_default()
-        
+
+
+
         # no two links share the same end nodes
         pair_nodes = {}
         v_new_constraint = {}
@@ -287,7 +293,6 @@ class MipEncode(object):
                     raise Exception("Node with id zero is not allowed (see documentation for check function.)")
                 #print('a', e.fro, e.to, e.controllable, e.relaxable_lb, e.relaxable_ub, e.get_lower_bound(), e.get_upper_bound())
                 if e.controllable:
-                    
                     # Make sure no two edges share the same from and to nodes
                     if (e.fro, e.to) not in self.encoded_node_pairs:
                         # add_controllable(e.fro,e.to,e.get_lower_bound(),e.get_upper_bound(),e.id)
@@ -453,10 +458,10 @@ class MipEncode(object):
                         # relax a ctg means tightening the bounds
                         if e.relaxable_lb:
                             #print(self.l[(e.fro, e.to)] )
-                            self.objexp -= (self.rl[(e.fro, e.to)] )*e.relax_cost_lb
+                            self.objexp -= (self.l[(e.fro, e.to)] )*e.relax_cost_lb
                             #self.objexp += (self.l[(e.fro, e.to)] - self.dis[(e.fro, e.to)][0])*e.relax_cost_lb
                         if e.relaxable_ub:
-                            self.objexp -= (self.ru[(e.fro, e.to)])*e.relax_cost_ub
+                            self.objexp -= (self.u[(e.fro, e.to)])*e.relax_cost_ub
 
                             # self.objexp += -(self.u[(e.fro, e.to)] - self.dis[(e.fro, e.to)][1])*e.relax_cost_ub
                 else:

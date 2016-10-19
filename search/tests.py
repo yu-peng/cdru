@@ -5,7 +5,6 @@ import unittest
 from os.path import join, dirname
 from math import fabs
 from tpn import Tpn
-from controllability.dynamic_controllability import DynamicControllability
 from temporal_network.tpnu import Tpnu, ChanceConstrained
 from search.search_problem import SearchProblem
 from temporal_network.tpnu import FeasibilityType, ObjectiveType
@@ -24,14 +23,7 @@ class SearchTests(unittest.TestCase):
     # used in most of the tests.
     def assert_cdru_result(self, example_file, f_type, o_type, c_type, expected_result):
         path = join(self.examples_dir, example_file)
-
-        if Tpnu.isCCTP(path):
-            tpnu = Tpnu.parseCCTP(path)
-        elif Tpnu.isTPN(path):
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-            tpnu = Tpnu.from_tpn_autogen(obj)
-        else:
-            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+        tpnu = self.getProblemFromFile(path)
 
         startTime = datetime.now()
         search_problem = SearchProblem(tpnu,f_type,o_type,c_type)
@@ -61,19 +53,12 @@ class SearchTests(unittest.TestCase):
         self.assertEqual(is_feasible, expected_result)
 
     # used in most of the tests.
-    def assert_mip_result(self, example_file, expected_result):
+    def assert_mip_result(self, example_file, o_type, expected_result):
         path = join(self.examples_dir, example_file)
-
-        if Tpnu.isCCTP(path):
-            tpnu = Tpnu.parseCCTP(path)
-        elif Tpnu.isTPN(path):
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-            tpnu = Tpnu.from_tpn_autogen(obj)
-        else:
-            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
+        tpnu = self.getProblemFromFile(path)
 
         startTime = datetime.now()
-        mip_solver = MipEncode(tpnu,ObjectiveType.MIN_COST)
+        mip_solver = MipEncode(tpnu,o_type)
         solution = mip_solver.mip_solver()
 
         runtime = datetime.now() - startTime
@@ -90,19 +75,11 @@ class SearchTests(unittest.TestCase):
         is_feasible = solution is not None
         self.assertEqual(is_feasible, expected_result)
 
-
-    def compare_cdru_mip(self, example_file, expected_result):
+    def compare_cdru_mip(self, example_file, f_type, o_type, c_type, expected_result):
         path = join(self.examples_dir, example_file)
+        tpnu = self.getProblemFromFile(path)
 
-        if Tpnu.isCCTP(path):
-            tpnu = Tpnu.parseCCTP(path)
-        elif Tpnu.isTPN(path):
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-            tpnu = Tpnu.from_tpn_autogen(obj)
-        else:
-            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
-
-        search_problem = SearchProblem(tpnu,FeasibilityType.DYNAMIC_CONTROLLABILITY,ObjectiveType.MAX_FLEX_UNCERTAINTY)
+        search_problem = SearchProblem(tpnu,f_type,o_type,c_type)
         search_problem.initialize()
 
         solution = search_problem.next_solution()
@@ -120,14 +97,8 @@ class SearchTests(unittest.TestCase):
 
         # test mip_encode
 
-        if Tpnu.isCCTP(path):
-            tpnu = Tpnu.parseCCTP(path)
-        elif Tpnu.isTPN(path):
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
-            tpnu = Tpnu.from_tpn_autogen(obj)
-        else:
-            raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
-        mip_solver = MipEncode(tpnu)
+        tpnu = self.getProblemFromFile(path)
+        mip_solver = MipEncode(tpnu,o_type)
         solution2 = mip_solver.mip_solver()
         diff = 0
         if fabs(solution.utility - solution2.utility) >= 1e-2 and not(solution.utility >= 100 and solution2.utility >= 100):
@@ -143,134 +114,112 @@ class SearchTests(unittest.TestCase):
             print(example_file)
             print(None)
 
-    def assert_mip_maxflex_result(self, example_file, expected_result):
-        path = join(self.examples_dir, example_file)
-
+    def getProblemFromFile(self, path):
         if Tpnu.isCCTP(path):
             tpnu = Tpnu.parseCCTP(path)
         elif Tpnu.isTPN(path):
-            obj = Tpn.parseTPN(join(self.examples_dir, example_file))
+            obj = Tpn.parseTPN(path)
             tpnu = Tpnu.from_tpn_autogen(obj)
         else:
             raise Exception("Input file " + path + " is neither a CCTP nor a TPN")
 
-        startTime = datetime.now()
-        mip_solver = MipEncode(tpnu,ObjectiveType.MAX_FLEX_UNCERTAINTY)
-        solution = mip_solver.mip_solver()
-
-        runtime = datetime.now() - startTime
-
-        print("----------------------------------------")
-        if solution is not None:
-            print(example_file)
-            solution.pretty_print()
-            # print(solution.json_print(example_file,"CDRU+PuLP",runtime.total_seconds()))
-        else:
-            print(example_file)
-            print(None)
-            #search_problem.pretty_print()
-        is_feasible = solution is not None
-        self.assertEqual(is_feasible, expected_result)
+        return tpnu
             
-#     def test_cdru_basic(self):
-#         self.assert_cdru_result('test1.tpn', True)
-#         self.assert_cdru_result('test2.tpn', True)
-#         self.assert_cdru_result('test3.tpn', True)
-#         self.assert_cdru_result('test4.tpn', True)
+    def test_cdru_basic(self):
+        f_type = FeasibilityType.CONSISTENCY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('test1.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('test2.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('test3.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('test4.tpn', f_type, o_type, c_type, True)
+
+    def test_whoi(self):
+        f_type = FeasibilityType.CONSISTENCY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('whoi-1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('whoi-2.cctp', f_type, o_type, c_type, True)
+
+    def test_transit_schedule(self):
+        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('Route1_2_1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Route1_2_2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Route_Red_Headway_2_Stop_2.cctp', f_type, o_type, c_type, True)
+
+    def test_bus_selection(self):
+        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('bus-1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('bus-2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('bus-3.cctp', f_type, o_type, c_type, False)
+        self.assert_cdru_result('bus-4.cctp', f_type, o_type, c_type, True)
 #  
-#     def test_whoi(self):
-#         self.assert_cdru_result('whoi-1.cctp', True)
-#         self.assert_cdru_result('whoi-2.cctp', True)
-#  
-#     def test_bus_schedule(self):
-#         self.assert_cdru_result('Route1_2_1.cctp', True)
-#         self.assert_cdru_result('Route1_2_2.cctp', True)
-#  
-#     def test_bus_selection(self):
-#         self.assert_cdru_result('bus-1.cctp', True)
-#         self.assert_cdru_result('bus-2.cctp', True)
-#         self.assert_cdru_result('bus-3.cctp', False)
-#         self.assert_cdru_result('bus-4.cctp', True)
-#  
-#     def test_cctp_zipcar(self):
-#         self.assert_cdru_result('Zipcar-1.cctp', True)
-#         self.assert_cdru_result('Zipcar-2.cctp', True)
-#         self.assert_cdru_result('Zipcar-3.cctp', True)
-#         self.assert_cdru_result('Zipcar-4.cctp', True)
-#  
-#     def test_tpn_zipcar(self):
-#         self.assert_cdru_result('Zipcar-1.tpn', True)
-#         self.assert_cdru_result('Zipcar-2.tpn', True)
-#         self.assert_cdru_result('Zipcar-3.tpn', True)
-#         self.assert_cdru_result('Zipcar-4.tpn', True)
-#         self.assert_cdru_result('Zipcar-5.tpn', True)
-#         self.assert_cdru_result('Zipcar-6.tpn', True)
-#         self.assert_cdru_result('Zipcar-7.tpn', True)
-#         self.assert_cdru_result('Zipcar-8.tpn', True)
-#         self.assert_cdru_result('Zipcar-9.tpn', True)
-#         self.assert_cdru_result('Zipcar-10.tpn', True)
-# 
+    def test_cctp_zipcar(self):
+        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('Zipcar-1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-10.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-3.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-4.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-5.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-8.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-9.cctp', f_type, o_type, c_type, True)
+
+    def test_tpn_zipcar(self):
+        f_type = FeasibilityType.CONSISTENCY
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('Zipcar-1.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-2.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-3.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-4.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-5.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-6.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-7.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-8.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-9.tpn', f_type, o_type, c_type, True)
+        self.assert_cdru_result('Zipcar-10.tpn', f_type, o_type, c_type, True)
+
+    def test_mip_auv(self):
+        o_type = ObjectiveType.MIN_COST
+        self.assert_mip_result('AUV-7.cctp', o_type, True)
+
     def test_max_flex_rcpsp(self):
-        # self.assert_max_flex_result('PSP1.SCH1.cctp', True)
-        #self.assert_max_flex_result('PSP1.SCH2.cctp', True)
-        testlist = "/home/jing/workspace/testcase/list.txt"
-        f = open(testlist)
-        s = f.readline()
-        self.ofile = open('output.txt','w')
-        self.ofile.close()
-
-        while len(s) > 1:
-            s = s.replace('\n','')
-            self.assert_max_flex_result(s, True)
-            s = f.readline()
-        self.ofile.close()
-        #          self.assert_max_flex_result('PSP1.SCH3.cctp', True)
-        #          self.assert_max_flex_result('PSP10.SCH1.cctp', True)
-        #          self.assert_max_flex_result('PSP100.SCH1.cctp', True)
-        #          self.assert_max_flex_result('PSP100.SCH2.cctp', True)
-        #          self.assert_max_flex_result('PSP100.SCH3.cctp', True)
-
-        self.assert_max_flex_result('PSP1.SCH1.cctp', True)
-        self.assert_max_flex_result('PSP1.SCH2.cctp', True)
-        self.assert_max_flex_result('PSP1.SCH3.cctp', True)
-        self.assert_max_flex_result('PSP10.SCH1.cctp', True)
-        self.assert_max_flex_result('PSP100.SCH1.cctp', True)
-        self.assert_max_flex_result('PSP100.SCH2.cctp', True)
-        self.assert_max_flex_result('PSP100.SCH3.cctp', True)
-
-    def test_redline_schedule(self):
-        self.assert_cdru_result('Route_Red_Headway_2_Stop_3.cctp', True)
-        # self.assert_mip_result('Route_Red_Headway_2_Stop_3.cctp', True)
+        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
+        o_type = ObjectiveType.MAX_FLEX_UNCERTAINTY
+        c_type = ChanceConstrained.OFF
+        self.assert_cdru_result('PSP1.SCH1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP1.SCH2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP1.SCH3.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP10.SCH1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP100.SCH1.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP100.SCH2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP100.SCH3.cctp', f_type, o_type, c_type, True)
 
     def test_auv_schedule(self):
         o_type = ObjectiveType.MIN_COST
         c_type = ChanceConstrained.OFF
         for f_type in [FeasibilityType.CONSISTENCY, FeasibilityType.STRONG_CONTROLLABILITY, FeasibilityType.STRONG_CONTROLLABILITY]:
-            self.assert_cdru_result('AUV-1.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-2.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-3.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-4.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-10.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-24.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-100.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-105.cctp', f_type, o_type,
-                                    c_type, True)
-            self.assert_cdru_result('AUV-1000.cctp', f_type, o_type,
-                                    c_type, True)
+            self.assert_cdru_result('AUV-1.cctp', f_type, o_type, c_type, True)
+            self.assert_cdru_result('AUV-2.cctp', f_type, o_type, c_type, True)
+            self.assert_cdru_result('AUV-3.cctp', f_type, o_type, c_type, True)
+            self.assert_cdru_result('AUV-4.cctp', f_type, o_type, c_type, True)
+
+    def test_auv_mip(self):
+        o_type = ObjectiveType.MIN_COST
+        c_type = ChanceConstrained.OFF
+        f_type = FeasibilityType.CONSISTENCY
+        self.assert_cdru_result('AUV-4.cctp', f_type, o_type, c_type, True)
 
     def test_auv_cc_schedule(self):
-
         f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
         o_type = ObjectiveType.MIN_COST
         c_type = ChanceConstrained.ON
-
         self.assert_cdru_result('AUV-2364.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-1.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-2.cctp', f_type, o_type, c_type, True)
@@ -282,82 +231,18 @@ class SearchTests(unittest.TestCase):
         # self.assert_cdru_result('AUV-105.cctp', f_type, o_type, c_type, True)
         # self.assert_cdru_result('AUV-1000.cctp', f_type, o_type, c_type, True)
 
-    def test_MIP_RCPSP(self):
-        self.assert_mip_maxflex_result('PSP1.SCH3.cctp', True)
-
-    def test_CDRU_RCPSP(self):
-        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
+    def test_mip_rcpsp(self):
         o_type = ObjectiveType.MAX_FLEX_UNCERTAINTY
-        c_type = ChanceConstrained.OFF
-        # self.assert_max_flex_result('PSP1.SCH3.cctp', True)
-        self.assert_cdru_result('PSP189.SCH2.cctp', f_type, o_type, c_type, True)
+        self.assert_cdru_result('PSP1.SCH1.cctp', o_type, True)
+        self.assert_cdru_result('PSP1.SCH2.cctp', o_type, True)
+        self.assert_cdru_result('PSP1.SCH3.cctp', o_type, True)
+        self.assert_cdru_result('PSP10.SCH1.cctp', o_type, True)
+        self.assert_cdru_result('PSP100.SCH1.cctp', o_type, True)
+        self.assert_cdru_result('PSP100.SCH2.cctp', o_type, True)
+        self.assert_cdru_result('PSP100.SCH3.cctp', o_type, True)
 
     def test_CDRU_Evacuation(self):
         f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
         o_type = ObjectiveType.MAX_FLEX_UNCERTAINTY
         c_type = ChanceConstrained.OFF
         self.assert_cdru_result('81r.cctp', f_type, o_type, c_type, True)
-
-    def test_tpn_zipcar11(self):
-
-        f_type = FeasibilityType.DYNAMIC_CONTROLLABILITY
-        o_type = ObjectiveType.MIN_COST
-        c_type = ChanceConstrained.OFF
- 
-        # build a kirk problem
-        # first create a Tpnu
-        tpnu = Tpnu('id','trip')
-        # event
-        # create events for this tpnu
-        node_number_to_id = {}
-        start_event = 1
-        end_event = 2
- 
-        node_number_to_id[1] = 'start'
-        node_number_to_id[2] = 'end'
- 
-        event_idx = 3
-        constraint_idx = 1;
- 
-        # decision variable
-        # create a decision variable to represent the choies over restaurants
-        tpnu_decision_variable = DecisionVariable('dv','where to go?')
-        tpnu.add_decision_variable(tpnu_decision_variable)
- 
-        # Then iterate through all goals and add them as domain assignments
-        goal = 'somewhere'
-        assignment = Assignment(tpnu_decision_variable, 'somewhere', 10.0)
-        tpnu_decision_variable.add_domain_value(assignment)
- 
-        home_to_restaurant = TemporalConstraint('ep-'+str(constraint_idx), 'go to '+str(goal)+'-'+str(constraint_idx), start_event, event_idx, 36.065506858138214, 44.08006393772449)
-        constraint_idx += 1
-        event_idx += 1
- 
-        eat_at_restaurant = TemporalConstraint('ep-'+str(constraint_idx), 'dine at '+str(goal)+'-'+str(constraint_idx), event_idx-1, end_event, 0, 30)
-        constraint_idx += 1
- 
-        node_number_to_id[event_idx-1] = 'arrive-'+str(goal)
- 
-        home_to_restaurant.add_guard(assignment)
-        eat_at_restaurant.add_guard(assignment)
- 
-        tpnu.add_temporal_constraint(home_to_restaurant)
-        tpnu.add_temporal_constraint(eat_at_restaurant)
- 
- 
-        # temporal constraints
-        # create constraints for the duration of the trip
-        tpnu_constraint = TemporalConstraint('tc-'+str(constraint_idx), 'tc-'+str(constraint_idx), start_event, end_event, 0, 15)
-        constraint_idx += 1
-        tpnu_constraint.relaxable_ub = True
-        tpnu_constraint.relax_cost_ub = 0.1
-        tpnu.add_temporal_constraint(tpnu_constraint)
- 
-        tpnu.num_nodes = event_idx-1
-        tpnu.node_number_to_id = node_number_to_id
- 
-        # next formulate a search problem using this tpnu
-        search_problem = SearchProblem(tpnu,f_type,o_type,c_type)
-        search_problem.initialize()
- 
-        solution = search_problem.next_solution()

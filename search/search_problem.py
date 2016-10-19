@@ -1,8 +1,7 @@
+__author__ = 'yupeng'
+
 from controllability.strong_controllability import StrongControllability
 from controllability.temporal_consistency import TemporalConsistency
-from search.mincost_cc_relaxation import ChanceConstrainedRelaxation
-
-__author__ = 'yupeng'
 
 from queue import PriorityQueue
 from search.candidate import Candidate
@@ -248,6 +247,12 @@ class SearchProblem(object):
             self.implement(candidate)
             if self.objective_type == ObjectiveType.MIN_COST:
                 if self.chance_constrained == ChanceConstrained.ON:
+                    try:
+                        from search.mincost_cc_relaxation import ChanceConstrainedRelaxation
+                    except ImportError:
+                        # pass # Gurobi doesn't exist, use default Pulp solver.
+                        raise Exception("Missing subsolvers on this system for chance-constrained relaxation. Check if you have scipy and snopt installed correctly.")
+
                     relaxations, allocations, cc_relaxations, utility = ChanceConstrainedRelaxation.generate_cc_relaxations(candidate,
                                                                                                negative_cycle,self.feasibility_type,self.cc)
                     if relaxations is not None or allocations is not None:
@@ -278,7 +283,7 @@ class SearchProblem(object):
                         new_candidate.resolved_conflicts.add(conflict)
                         new_candidate.continuously_resolved_cycles.add(negative_cycle)
                         # Override the utility to reflex the max-flexibility enabled by this candidate
-                        new_candidate.f = max_flex_value
+                        new_candidate.g = max_flex_value
                         # print("New flex value: " + str(new_candidate.f))
                         # new_candidate.pretty_print()
                         self.add_candidate_to_queue(new_candidate)
@@ -339,7 +344,7 @@ class SearchProblem(object):
                 # and the guard must have been satisfied
                 if len(variable.guards) == 0 or variable.guards <= new_candidate.assignments:
                     new_candidate.unassigned_variables.put(variable)
-                    new_candidate.g += variable.optimal_utility
+                    new_candidate.h += variable.optimal_utility
 
         return new_candidate
 
@@ -377,7 +382,7 @@ class SearchProblem(object):
                 # and the guard must have been satisfied
                 if len(variable.guards) == 0 or variable.guards <= new_candidate.assignments:
                     new_candidate.unassigned_variables.put(variable)
-                    new_candidate.g += variable.optimal_utility
+                    new_candidate.h += variable.optimal_utility
 
         return new_candidate
 

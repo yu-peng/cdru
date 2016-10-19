@@ -1,10 +1,10 @@
+__author__ = 'yupeng'
+
 import scipy
 
 from search.chance_constraint_relaxation import ChanceConstraintRelaxation
 from search.temporal_allocation import TemporalAllocation
 from temporal_network.chance_constraint import ChanceConstraint
-
-__author__ = 'yupeng'
 
 from search.candidate import Candidate
 from search.conflict import NegativeCycle

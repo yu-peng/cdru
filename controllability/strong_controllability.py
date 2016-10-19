@@ -78,7 +78,7 @@ consistencies to controllabilities" by Thierry VIDAL and Helene FARGIER"""
         def add_controllable(fro, to, lb, ub, edge_id):
 
             # lb cannot be larger than ub
-            assert lb <= ub
+            # assert lb <= ub
 
             ub_edge = DistanceGraphEdge(fro, to, ub, EdgeType.SIMPLE, renaming=renaming)
             lb_edge = DistanceGraphEdge(to, fro, -lb, EdgeType.SIMPLE, renaming=renaming)

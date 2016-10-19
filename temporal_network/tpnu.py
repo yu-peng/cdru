@@ -224,8 +224,8 @@ class Tpnu(object):
             tpnu.add_temporal_constraint(constraint)
 
         # Parse Chance Constraint
-        risk_bound = float(e.find('RISK-BOUND').text)
-        risk_bound_relax_cost = float(e.find('RISK-BOUND-RELAX-COST').text)
+        # risk_bound = float(e.find('RISK-BOUND').text)
+        # risk_bound_relax_cost = float(e.find('RISK-BOUND-RELAX-COST').text)
 
         risk_bound = 0.05
         risk_bound_relax_cost = 100
