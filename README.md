@@ -14,7 +14,7 @@ There are many examples you may refer to in tests.py inside the search folder. H
 
 2. Construct the search problem: `search_problem = SearchProblem(tpnu,f_type,o_type,c_type)`. The constructor needs the tpnu object and three parameters:
 
-    * `f_type`: the feasibility model used by CDRU. The three options are: `FeasibilityType.CONSISTENCY`, `FeasibilityType.STRONG_CONTROLLABILITY`, and `FeasibilityType.STRONG_CONTROLLABILITY`. 
+    * `f_type`: the feasibility model used by CDRU. The three options are: `FeasibilityType.CONSISTENCY`, `FeasibilityType.STRONG_CONTROLLABILITY`, and `FeasibilityType.DYNAMIC_CONTROLLABILITY`. 
 
     * `o_type`: the objective function used by CDRU. The two options are: `ObjectiveType.MIN_COST` and `ObjectiveType.MAX_FLEX_UNCERTAINTY`. Currently, the second option is only used for some RCPSP problems, which are feasible and require CDRU to find the maximum range that can be built into the uncertain durations while maintaining Strong/Dynamic controllability. The default LP solver is PuLP. Gurobi is also supported if you have it installed. 
  
